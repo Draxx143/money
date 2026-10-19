@@ -35,6 +35,9 @@ public:
     void setProject(Project *project);
     // The component that "Add..." proposes, usually the one selected elsewhere.
     void setContextComponent(const QString &uid);
+    // The open diagnostic session, so a reading can be filed under it.
+    void setSessionId(const QString &uid) { m_sessionId = uid; }
+    QString sessionId() const { return m_sessionId; }
 
     int visibleCount() const;
     QString selectedTestPointUid() const;
@@ -72,6 +75,7 @@ private:
 
     Project *m_project = nullptr;
     QString m_contextComponent;
+    QString m_sessionId;
     QString m_selected;
 
     QTreeWidget *m_tree = nullptr;

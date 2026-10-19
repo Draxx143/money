@@ -152,7 +152,62 @@ project.
 Test points and measurements are stored in the project file, so they travel with
 the board and survive save and reload.
 
-## 6. Component details and knowledge
+## 6. Diagnosis
+
+The **Diagnostics** panel (bottom of the window, next to *Test points*) is where
+the fault is narrowed down. It does not guess: it weighs what the project
+contains and shows the sentence behind every number.
+
+**Sessions** – `Session...` opens one with a title and one symptom per line, and
+closes it with what was done and what happened. A reading taken while a session
+is open is filed under it, so a later report can say which bench session
+produced it.
+
+**Hypotheses** – `Add...` records what might be wrong, which components it is
+about, and what would disprove it. Each row shows four things: the status **you**
+recorded, the status the **evidence** suggests, the score, and how much speaks
+for and against. When the two disagree, the suggestion is shown in amber and the
+tooltip says which is which — the recorded status is always kept, and the engine
+never silently replaces it.
+
+**Evidence** – `Evidence...` attaches one piece: what it is, which way it
+points, what it says, why it counts, and how sure you are. Choosing a stored
+reading fills the fields in with the verdict that reading already carries. Every
+piece is weighed, and the weight is explained:
+
+| What it is | Counts | Notes |
+| --- | --- | --- |
+| a repair | 3.0 | the behaviour changed when a part was changed |
+| a measurement | 2.0 | |
+| a source document | 1.0 | datasheet, schematic, service manual |
+| an observation | 0.5 | seen on the bench |
+| prior knowledge | 0.25 | a hint, not a proof |
+
+The weight is scaled down by how trustworthy the piece is (halved when it has no
+source, again when it was only suggested by a model) and a reading nobody can
+judge — no expected value, or a unit that means something else — is kept on
+record but weighs **nothing**, with the reason written next to it.
+
+**What the score means** – *how much evidence there is × which way it points*,
+between 0 and 1. With no evidence the score is exactly zero and the status stays
+`Possible`: nothing is called plausible because it sounds likely or because it
+was written first. A single reading confirms nothing however clear it looks — it
+takes a reading plus something else, or two of them, before the panel says
+*confirmed by measurement*. A successful repair is the only single piece of
+evidence that confirms on its own.
+
+**Suggestions** – `Suggest...` builds candidates only from data that is really
+in the project: a stored reading that came out of range names its net, and every
+component on that net becomes a candidate of its own saying it is one of N. If
+no reading failed, the dialog says so instead of inventing one. Each candidate
+carries the reading it came from into the notes of the hypothesis it becomes.
+
+**Measure next** – always visible, always with a reason: the test points that
+were never measured, ranked, with the ones on a net that already failed on top.
+A reading that proves nothing yet (no expected value) is listed there as a gap
+to close, not as a result.
+
+## 7. Component details and knowledge
 
 Select a component in the list, or click it on the board, and the **Component
 details** panel shows it in two tabs.
@@ -178,7 +233,7 @@ The knowledge database is a single SQLite file in your data directory
 computer, and `Settings → Database` shows where it is, how large it is, how many
 records and facts it holds, and lets you check and compact it.
 
-## 7. Settings
+## 8. Settings
 
 `Settings → Configure…` opens a nine page dialog:
 
@@ -197,7 +252,7 @@ records and facts it holds, and lets you check and compact it.
 8. **Logging** – log level, how many days of log files are kept.
 9. **Import Options** – defaults applied when a board file is imported.
 
-## 8. Privacy
+## 9. Privacy
 
 Nothing leaves the computer unless you explicitly configure an AI provider and
 enable network access on the *Privacy & Network* page. Both are off by default,

@@ -25,6 +25,7 @@ class ComponentDetails;
 class ComponentExplorer;
 class LogPanel;
 class Project;
+class DiagnosticsPanel;
 class TestPointPanel;
 
 class MainWindow : public QMainWindow
@@ -39,6 +40,7 @@ public:
     ComponentExplorer *componentExplorer() const { return m_explorer; }
     ComponentDetails *componentDetails() const { return m_details; }
     TestPointPanel *testPointPanel() const { return m_testPoints; }
+    DiagnosticsPanel *diagnosticsPanel() const { return m_diagnostics; }
     LogPanel *logPanel() const { return m_logPanel; }
     QAction *action(const QString &objectName) const;
 
@@ -100,6 +102,7 @@ private:
     ComponentExplorer *m_explorer = nullptr;
     ComponentDetails *m_details = nullptr;
     TestPointPanel *m_testPoints = nullptr;
+    DiagnosticsPanel *m_diagnostics = nullptr;
     AssistantPanel *m_assistant = nullptr;
     LogPanel *m_logPanel = nullptr;
 

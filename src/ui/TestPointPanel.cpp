@@ -717,9 +717,9 @@ QString TestPointPanel::recordMeasurement(const QString &testPointUid, double va
         return QString();
     }
 
-    const Measurement measurement = eda::recordMeasurement(*point, value, unit.trimmed(),
-                                                           QDateTime::currentDateTimeUtc(),
-                                                           instrument, conditions, notes);
+    const Measurement measurement =
+        eda::recordMeasurement(*point, value, unit.trimmed(), QDateTime::currentDateTimeUtc(),
+                               instrument, conditions, notes, m_sessionId);
     m_project->data().measurements.append(measurement);
     refresh();
     logInfo(QStringLiteral("testpoints"),

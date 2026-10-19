@@ -8,14 +8,17 @@
 # the public and private QtCore headers plus a handful of helper headers from
 # the qtbase source tree, so it can be compiled against the prebuilt QtCore.
 #
-# Usage: build-moc.sh <qtbase-source-dir> <qt-include-dir> <qt-lib-dir> <output-dir>
+# Usage: build-moc.sh <qtbase-source-dir> <qt-include-dir> <qt-lib-dir> <output-dir> [stub-lib-dir]
 #
 set -euo pipefail
 
 QTSRC=${1:?usage: $0 <qtbase-src> <qt-include-dir> <qt-lib-dir> <output-dir>}
 QTINC=${2:?usage: $0 <qtbase-src> <qt-include-dir> <qt-lib-dir> <output-dir>}
 QTLIB=${3:?usage: $0 <qtbase-src> <qt-include-dir> <qt-lib-dir> <output-dir>}
-OUT=${4:?usage: $0 <qtbase-src> <qt-include-dir> <qt-lib-dir> <output-dir>}
+OUT=${4:?usage: $0 <qtbase-src> <qt-include-dir> <qt-lib-dir> <output-dir> [stub-lib-dir]}
+# The stub libraries are optional: they only exist in containers without the
+# host libraries the prebuilt Qt runtime links to.
+STUBS=${5:-}
 
 CXX=${CXX:-g++}
 command -v "$CXX" >/dev/null || { echo "no C++ compiler ($CXX)" >&2; exit 1; }

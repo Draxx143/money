@@ -275,6 +275,83 @@ MeasurementStatus measurementStatusFromString(const QString &text)
     return MeasurementStatus::Unknown;
 }
 
+QString toString(EvidenceKind kind)
+{
+    switch (kind) {
+    case EvidenceKind::Measurement: return QStringLiteral("measurement");
+    case EvidenceKind::Observation: return QStringLiteral("observation");
+    case EvidenceKind::SourceDocument: return QStringLiteral("source-document");
+    case EvidenceKind::Repair: return QStringLiteral("repair");
+    case EvidenceKind::PriorKnowledge: return QStringLiteral("prior-knowledge");
+    case EvidenceKind::Unknown: break;
+    }
+    return QStringLiteral("unknown");
+}
+
+EvidenceKind evidenceKindFromString(const QString &text)
+{
+    const QString t = text.trimmed().toLower();
+    if (t == QLatin1String("measurement")) return EvidenceKind::Measurement;
+    if (t == QLatin1String("observation")) return EvidenceKind::Observation;
+    if (t == QLatin1String("source-document")) return EvidenceKind::SourceDocument;
+    if (t == QLatin1String("repair")) return EvidenceKind::Repair;
+    if (t == QLatin1String("prior-knowledge")) return EvidenceKind::PriorKnowledge;
+    return EvidenceKind::Unknown;
+}
+
+QString toString(EvidenceDirection direction)
+{
+    switch (direction) {
+    case EvidenceDirection::Supports: return QStringLiteral("supports");
+    case EvidenceDirection::Contradicts: return QStringLiteral("contradicts");
+    case EvidenceDirection::Neutral: break;
+    }
+    return QStringLiteral("neutral");
+}
+
+EvidenceDirection evidenceDirectionFromString(const QString &text)
+{
+    const QString t = text.trimmed().toLower();
+    if (t == QLatin1String("supports")) return EvidenceDirection::Supports;
+    if (t == QLatin1String("contradicts")) return EvidenceDirection::Contradicts;
+    return EvidenceDirection::Neutral;
+}
+
+QJsonObject Evidence::toJson() const
+{
+    QJsonObject o;
+    o.insert(QStringLiteral("uid"), uid);
+    o.insert(QStringLiteral("hypothesisUid"), hypothesisUid);
+    o.insert(QStringLiteral("kind"), eda::toString(kind));
+    o.insert(QStringLiteral("direction"), eda::toString(direction));
+    o.insert(QStringLiteral("refId"), refId);
+    o.insert(QStringLiteral("statement"), statement);
+    o.insert(QStringLiteral("reason"), reason);
+    o.insert(QStringLiteral("inconclusive"), inconclusive);
+    o.insert(QStringLiteral("provenance"), provenance.toJson());
+    o.insert(QStringLiteral("recorded"), recorded.toString(Qt::ISODate));
+    o.insert(QStringLiteral("sessionId"), sessionId);
+    return o;
+}
+
+Evidence Evidence::fromJson(const QJsonObject &json)
+{
+    Evidence e;
+    e.uid = json.value(QStringLiteral("uid")).toString();
+    e.hypothesisUid = json.value(QStringLiteral("hypothesisUid")).toString();
+    e.kind = evidenceKindFromString(json.value(QStringLiteral("kind")).toString());
+    e.direction = evidenceDirectionFromString(json.value(QStringLiteral("direction")).toString());
+    e.refId = json.value(QStringLiteral("refId")).toString();
+    e.statement = json.value(QStringLiteral("statement")).toString();
+    e.reason = json.value(QStringLiteral("reason")).toString();
+    e.inconclusive = json.value(QStringLiteral("inconclusive")).toBool();
+    e.provenance = Provenance::fromJson(json.value(QStringLiteral("provenance")).toObject());
+    e.recorded = QDateTime::fromString(json.value(QStringLiteral("recorded")).toString(),
+                                       Qt::ISODate);
+    e.sessionId = json.value(QStringLiteral("sessionId")).toString();
+    return e;
+}
+
 QString toString(HypothesisStatus status)
 {
     switch (status) {
@@ -861,6 +938,7 @@ QJsonObject ProjectData::toJson() const
     o.insert(QStringLiteral("testPoints"), arrayToJson(testPoints));
     o.insert(QStringLiteral("measurements"), arrayToJson(measurements));
     o.insert(QStringLiteral("hypotheses"), arrayToJson(hypotheses));
+    o.insert(QStringLiteral("evidence"), arrayToJson(evidence));
     o.insert(QStringLiteral("sessions"), arrayToJson(sessions));
     o.insert(QStringLiteral("documents"), arrayToJson(documents));
     o.insert(QStringLiteral("notes"), stringListToJson(notes));
@@ -875,6 +953,7 @@ ProjectData ProjectData::fromJson(const QJsonObject &json)
     p.testPoints = arrayFromJson<TestPoint>(json.value(QStringLiteral("testPoints")));
     p.measurements = arrayFromJson<Measurement>(json.value(QStringLiteral("measurements")));
     p.hypotheses = arrayFromJson<Hypothesis>(json.value(QStringLiteral("hypotheses")));
+    p.evidence = arrayFromJson<Evidence>(json.value(QStringLiteral("evidence")));
     p.sessions = arrayFromJson<DiagnosticSession>(json.value(QStringLiteral("sessions")));
     p.documents = arrayFromJson<ImportedDocument>(json.value(QStringLiteral("documents")));
     p.notes = stringListFromJson(json.value(QStringLiteral("notes")));

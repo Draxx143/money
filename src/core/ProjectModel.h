@@ -289,6 +289,48 @@ struct Measurement
     static Measurement fromJson(const QJsonObject &json);
 };
 
+// What a piece of evidence is, in the terms the engine can weigh. The kind and
+// the provenance decide how much a piece of evidence counts -- never the order
+// in which it was written down.
+enum class EvidenceKind {
+    Unknown = 0,
+    Measurement,     // a stored reading, together with its verdict
+    Observation,     // seen on the bench: heat, a smell, a cracked part
+    SourceDocument,  // a datasheet, schematic or service manual says so
+    Repair,          // a part was replaced and the behaviour changed
+    PriorKnowledge   // this board, or this family, failed this way before
+};
+
+enum class EvidenceDirection { Supports = 0, Contradicts, Neutral };
+
+QString toString(EvidenceKind kind);
+EvidenceKind evidenceKindFromString(const QString &text);
+QString toString(EvidenceDirection direction);
+EvidenceDirection evidenceDirectionFromString(const QString &text);
+
+// One reason to believe -- or to stop believing -- one hypothesis. An
+// hypothesis without evidence stays "possible" and is never scored.
+struct Evidence
+{
+    QString uid;
+    QString hypothesisUid;
+    EvidenceKind kind = EvidenceKind::Unknown;
+    EvidenceDirection direction = EvidenceDirection::Supports;
+    QString refId;              // uid of the measurement, fact or document
+    QString statement;          // one line, in the words of whoever wrote it
+    QString reason;             // why it counts for or against this hypothesis
+    // A reading nobody can judge (no expected value, or a unit that means
+    // something else) is stored, but it weighs nothing: it is a gap in the
+    // data, not an argument.
+    bool inconclusive = false;
+    Provenance provenance;      // how trustworthy it is, and where it came from
+    QDateTime recorded;
+    QString sessionId;
+
+    QJsonObject toJson() const;
+    static Evidence fromJson(const QJsonObject &json);
+};
+
 enum class HypothesisStatus {
     Possible = 0,
     Plausible,
@@ -370,6 +412,7 @@ struct ProjectData
     QVector<TestPoint> testPoints;
     QVector<Measurement> measurements;
     QVector<Hypothesis> hypotheses;
+    QVector<Evidence> evidence;
     QVector<DiagnosticSession> sessions;
     QVector<ImportedDocument> documents;
     QStringList notes;

@@ -3,6 +3,7 @@
 #include "AssistantPanel.h"
 #include "BoardView.h"
 #include "ComponentDetails.h"
+#include "DiagnosticsPanel.h"
 #include "ComponentExplorer.h"
 #include "LogPanel.h"
 #include "SettingsDialog.h"
@@ -282,6 +283,27 @@ void MainWindow::createDocks()
     connect(m_explorer, &ComponentExplorer::componentSelected, m_testPoints,
             &TestPointPanel::setContextComponent);
 
+    m_diagnostics = new DiagnosticsPanel(this);
+    m_diagnostics->setProject(project());
+    auto *diagnosticsDock = new QDockWidget(tr("Diagnostics"), this);
+    diagnosticsDock->setObjectName(QStringLiteral("DiagnosticsDock"));
+    diagnosticsDock->setWidget(m_diagnostics);
+    tabifyDockWidget(testPointDock, diagnosticsDock);
+    m_docks.append(diagnosticsDock);
+    connect(m_diagnostics, &DiagnosticsPanel::hypothesesChanged, this, [this]() {
+        project()->markDirty();
+        updateProjectState();
+    });
+    // A hypothesis is usually about the component that is being looked at.
+    connect(m_explorer, &ComponentExplorer::componentSelected, m_diagnostics,
+            &DiagnosticsPanel::setContextComponent);
+    // A new reading can change what the data suggests, and vice versa.
+    connect(m_testPoints, &TestPointPanel::testPointsChanged, m_diagnostics,
+            &DiagnosticsPanel::refresh);
+    // Readings taken while a session is open belong to that session.
+    connect(m_diagnostics, &DiagnosticsPanel::activeSessionChanged, m_testPoints,
+            &TestPointPanel::setSessionId);
+
     m_logPanel = new LogPanel(this);
     auto *logDock = new QDockWidget(tr("Log"), this);
     logDock->setObjectName(QStringLiteral("LogDock"));
@@ -332,6 +354,7 @@ void MainWindow::connectProjectSignals()
     connect(project, &Project::opened, this, [this](const QString &path) {
         Application::instance()->settings()->addRecentProject(path);
         m_testPoints->refresh();
+        m_diagnostics->refresh();
         m_explorer->setBoard(this->project()->primaryBoard());
         m_boardView->setBoard(this->project()->primaryBoard());
         m_details->selectComponent(QString());
@@ -349,6 +372,7 @@ void MainWindow::connectProjectSignals()
     });
     connect(project, &Project::closed, this, [this]() {
         m_testPoints->refresh();
+        m_diagnostics->refresh();
         m_explorer->setBoard(nullptr);
         m_boardView->setBoard(nullptr);
         m_details->selectComponent(QString());
@@ -363,6 +387,7 @@ void MainWindow::connectProjectSignals()
     });
     connect(project, &Project::dataChanged, this, [this]() {
         m_testPoints->refresh();
+        m_diagnostics->refresh();
         m_explorer->setBoard(this->project()->primaryBoard());
         m_boardView->setBoard(this->project()->primaryBoard());
         m_details->refresh();
@@ -857,6 +882,8 @@ void MainWindow::updateProjectState()
     }
     QString text = tr("%1%2").arg(prj->displayName(),
                                   prj->isDirty() ? tr(" (unsaved changes)") : QString());
+    if (m_diagnostics != nullptr && !prj->data().hypotheses.isEmpty())
+        text += tr("  |  %1").arg(m_diagnostics->summaryText());
     if (m_testPoints != nullptr && !prj->data().testPoints.isEmpty()) {
         const TestCoverage coverage = m_testPoints->coverage();
         text += tr("  |  %n test point(s), %1 measured, %2 pass, %3 fail", "",

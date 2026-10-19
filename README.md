@@ -79,9 +79,31 @@ Milestone 4 (test points and measurements):
       coverage of what was not measured, round trip through the project) and 3
       UI cases for the panel
 
-The diagnostic engine and the optional AI assistant follow in later milestones.
-They are not advertised as working today, and there is no menu entry for them
-yet.
+Milestone 5 (diagnostic engine):
+
+* [x] Evidence as a first class record: what it is, which way it points, why it
+      counts and how trustworthy it is, attached to one hypothesis
+* [x] Every weight is explained. A repair counts 3.0, a measurement 2.0, a
+      source document 1.0, an observation 0.5, prior knowledge 0.25 -- scaled
+      down by how trustworthy it is and halved again when it was only suggested.
+      A reading that could not be judged is kept, but weighs nothing
+* [x] Honest scores: no evidence means a score of zero and the status
+      "possible". One reading confirms nothing however clear it looks; a
+      successful repair is the only single piece that confirms on its own
+* [x] The status you recorded and the status the evidence suggests are shown
+      side by side; the panel never overwrites the user's word
+* [x] Candidates built only from data in the project: a reading that failed
+      names its net and the parts on it, and every candidate carries the reading
+      it came from. When nothing failed, the panel says so instead of inventing
+      something
+* [x] "Measure next": the test points that would tell us the most, ranked, with
+      the reason for each; a reading that proves nothing yet is listed as a gap
+      to close, not as a result
+* [x] Sessions: title, symptoms, the readings filed under them, and an outcome
+* [x] Tests: 19 diagnostic cases and 3 UI cases for the panel
+
+The optional AI assistant follows in a later milestone. It is not advertised as
+working today, and there is no menu entry for it yet.
 
 ## Building
 

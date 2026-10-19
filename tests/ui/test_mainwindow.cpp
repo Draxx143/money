@@ -12,7 +12,9 @@
 #include "../../src/core/Project.h"
 #include "../../src/ui/BoardView.h"
 #include "../../src/ui/ComponentDetails.h"
+#include "../../src/core/Diagnostics.h"
 #include "../../src/ui/ComponentExplorer.h"
+#include "../../src/ui/DiagnosticsPanel.h"
 #include "../../src/ui/MainWindow.h"
 #include "../../src/ui/TestPointPanel.h"
 #include "../../src/ui/Theme.h"
@@ -774,6 +776,185 @@ private slots:
         QCOMPARE(panel->visibleCount(), 0);
         QCOMPARE(project->data().testPoints.size(), 0);
         QCOMPARE(project->data().measurements.size(), measurements);
+
+        QVERIFY(project->close());
+    }
+
+    void theDiagnosticsPanelWeighsWhatWasRecorded()
+    {
+        eda::Project *project = projectWithImportedBoard();
+        QVERIFY(project != nullptr);
+        eda::DiagnosticsPanel *panel = m_window->diagnosticsPanel();
+        QVERIFY(panel != nullptr);
+        QCOMPARE(panel->visibleCount(), 0);
+        QVERIFY(panel->activeSessionUid().isEmpty());
+
+        QString error;
+        const QString session =
+            panel->startSession(QStringLiteral("board is dead"),
+                                QStringList{ QStringLiteral("no 5 V") }, &error);
+        QVERIFY2(!session.isEmpty(), qPrintable(error));
+        QCOMPARE(panel->activeSessionUid(), session);
+        QVERIFY2(panel->statusText().contains(QStringLiteral("board is dead")),
+                 qPrintable(panel->statusText()));
+
+        const QString componentUid =
+            project->primaryBoard()->componentByReference(QStringLiteral("C1"))->uid;
+        const QString uid = panel->addHypothesis(QStringLiteral("the regulator is dead"),
+                                                QStringList{ componentUid }, &error);
+        QVERIFY2(!uid.isEmpty(), qPrintable(error));
+        QCOMPARE(panel->visibleCount(), 1);
+
+        // Nothing was put forward yet: it stays an idea and scores zero.
+        QCOMPARE(panel->scoreOf(uid).score, 0.0);
+        QCOMPARE(panel->scoreOf(uid).supporting, 0);
+        auto *tree = panel->findChild<QTreeWidget *>(QStringLiteral("diagnostics.tree"));
+        QVERIFY(tree != nullptr);
+        QCOMPARE(tree->topLevelItem(0)->text(0), QStringLiteral("the regulator is dead"));
+        QCOMPARE(tree->topLevelItem(0)->text(1), QStringLiteral("Possible"));
+        QCOMPARE(tree->topLevelItem(0)->text(3), QStringLiteral("0.00"));   // the score
+        QCOMPARE(tree->topLevelItem(0)->text(6), QStringLiteral("C1"));     // the components
+
+        eda::Evidence reading;
+        reading.hypothesisUid = uid;
+        reading.kind = eda::EvidenceKind::Measurement;
+        reading.direction = eda::EvidenceDirection::Supports;
+        reading.statement = QStringLiteral("VCC reads 0.02 V");
+        reading.provenance.status = eda::VerificationStatus::ExperimentallyVerified;
+        reading.provenance.valueSource = eda::ValueSource::Measured;
+        QVERIFY2(!panel->addEvidence(reading, &error).isEmpty(), qPrintable(error));
+
+        QCOMPARE(panel->evidenceCount(), 1);
+        QCOMPARE(panel->scoreOf(uid).supporting, 1);
+        QVERIFY2(panel->scoreOf(uid).score > 0.0,
+                 qPrintable(QString::number(panel->scoreOf(uid).score)));
+        QVERIFY2(panel->summaryText().contains(QStringLiteral("1 with evidence")),
+                 qPrintable(panel->summaryText()));
+        // The reading is filed under the session that is open.
+        QCOMPARE(project->data().evidence.first().sessionId, session);
+
+        // One reading is not a confirmation, however clear it looks.
+        QCOMPARE(tree->topLevelItem(0)->text(2), QStringLiteral("Plausible"));
+
+        eda::Evidence observation = reading;
+        observation.kind = eda::EvidenceKind::Observation;
+        observation.statement = QStringLiteral("the regulator smells burnt");
+        observation.provenance.status = eda::VerificationStatus::UserVerified;
+        observation.provenance.valueSource = eda::ValueSource::ManualEntry;
+        QVERIFY(!panel->addEvidence(observation, &error).isEmpty());
+        QCOMPARE(tree->topLevelItem(0)->text(2),
+                 QStringLiteral("Confirmed by measurement"));
+
+        // The recorded status is the user's word, and it is kept apart from
+        // what the evidence says.
+        auto *status = panel->findChild<QComboBox *>(QStringLiteral("diagnostics.status"));
+        QVERIFY(status != nullptr);
+        status->setCurrentIndex(status->findData(
+            eda::toString(eda::HypothesisStatus::ConfirmedByRepair)));
+        QCOMPARE(tree->topLevelItem(0)->text(1), QStringLiteral("Confirmed by repair"));
+        QCOMPARE(eda::toString(project->data().hypotheses.first().status),
+                 eda::toString(eda::HypothesisStatus::ConfirmedByRepair));
+
+        QVERIFY2(panel->closeSession(QStringLiteral("replaced the regulator"), &error),
+                 qPrintable(error));
+        QVERIFY(panel->activeSessionUid().isEmpty());
+
+        QVERIFY2(panel->removeHypothesis(uid, &error), qPrintable(error));
+        QCOMPARE(panel->visibleCount(), 0);
+        QVERIFY(project->close());
+    }
+
+    void whatTheDataSuggestsCanBecomeAnHypothesis()
+    {
+        eda::Project *project = projectWithImportedBoard();
+        QVERIFY(project != nullptr);
+        eda::TestPointPanel *testPoints = m_window->testPointPanel();
+        eda::DiagnosticsPanel *panel = m_window->diagnosticsPanel();
+
+        // With nothing measured there is nothing to point at.
+        QCOMPARE(panel->candidateCount(), 0);
+
+        eda::TestPoint point;
+        point.identifier = QStringLiteral("VCC");
+        point.componentUid = project->primaryBoard()->componentByReference(QStringLiteral("C1"))->uid;
+        point.netName = QStringLiteral("VCC");
+        point.category = QStringLiteral("voltage");
+        point.expectedValue = 5.0;
+        point.hasExpectedValue = true;
+        point.tolerance = 0.25;
+        point.hasTolerance = true;
+        point.unit = QStringLiteral("V");
+        QString error;
+        const QString pointUid = testPoints->addTestPoint(point, &error);
+        QVERIFY2(!pointUid.isEmpty(), qPrintable(error));
+        QVERIFY(!testPoints->recordMeasurement(pointUid, 4.0, QStringLiteral("V"),
+                                               QString(), QString(), QString(), &error)
+                     .isEmpty());
+
+        // The failed reading names the net and the parts on it.
+        QVERIFY2(panel->candidateCount() > 0, "a reading out of range is a place to look");
+        const QStringList uids = panel->acceptCandidates({ 0 }, &error);
+        QVERIFY2(!uids.isEmpty(), qPrintable(error));
+        QCOMPARE(panel->visibleCount(), 1);
+
+        auto *tree = panel->findChild<QTreeWidget *>(QStringLiteral("diagnostics.tree"));
+        QCOMPARE(tree->topLevelItem(0)->text(0), QStringLiteral("the fault is on net VCC"));
+        QCOMPARE(tree->topLevelItem(0)->text(1), QStringLiteral("Possible"));
+        QVERIFY2(tree->topLevelItem(0)->text(6).contains(QStringLiteral("C1")),
+                 qPrintable(tree->topLevelItem(0)->text(6)));
+        QVERIFY2(project->data().hypotheses.first().notes.contains(
+                     QStringLiteral("suggested from the data")),
+                 qPrintable(project->data().hypotheses.first().notes));
+
+        // A second test point on the same net was never measured: that is where
+        // to put the probe next, and the panel says why.
+        eda::TestPoint second = point;
+        second.identifier = QStringLiteral("VCC2");
+        QVERIFY2(!testPoints->addTestPoint(second, &error).isEmpty(), qPrintable(error));
+        QVERIFY2(panel->suggestionCount() > 0, "there is always a next step");
+        auto *next = panel->findChild<QTreeWidget *>(QStringLiteral("diagnostics.next"));
+        QVERIFY(next != nullptr);
+        QCOMPARE(next->topLevelItem(0)->text(0), QStringLiteral("VCC2"));
+        QVERIFY2(next->topLevelItem(0)->text(2).contains(QStringLiteral("net VCC")),
+                 qPrintable(next->topLevelItem(0)->text(2)));
+
+        QVERIFY(project->close());
+    }
+
+    void hypothesesAndEvidenceSurviveTheProject()
+    {
+        eda::Project *project = projectWithImportedBoard();
+        QVERIFY(project != nullptr);
+        eda::DiagnosticsPanel *panel = m_window->diagnosticsPanel();
+
+        QString error;
+        QVERIFY(!panel->startSession(QStringLiteral("unstable rail"), {}, &error).isEmpty());
+        const QString uid = panel->addHypothesis(QStringLiteral("C1 is dried out"),
+                                                QStringList{ QStringLiteral("comp-x") }, &error);
+        QVERIFY(!uid.isEmpty());
+        eda::Evidence reading;
+        reading.hypothesisUid = uid;
+        reading.kind = eda::EvidenceKind::Measurement;
+        reading.direction = eda::EvidenceDirection::Supports;
+        reading.statement = QStringLiteral("C1 reads 12 nF");
+        reading.provenance.status = eda::VerificationStatus::ExperimentallyVerified;
+        reading.provenance.valueSource = eda::ValueSource::Measured;
+        QVERIFY(!panel->addEvidence(reading, &error).isEmpty());
+
+        const QString path = eda::TestEnvironment::root() + QStringLiteral("/diagnostics.pwb");
+        QVERIFY2(project->saveAs(path, &error), qPrintable(error));
+        QVERIFY(project->close());
+        QVERIFY2(project->open(path, &error), qPrintable(error));
+
+        QCOMPARE(panel->visibleCount(), 1);
+        QCOMPARE(project->data().evidence.size(), 1);
+        QVERIFY(!panel->activeSessionUid().isEmpty());
+
+        panel->selectHypothesis(uid);
+        QCOMPARE(panel->evidenceCount(), 1);
+        QCOMPARE(panel->scoreOf(uid).supporting, 1);
+        QVERIFY2(panel->summaryText().contains(QStringLiteral("1 with evidence")),
+                 qPrintable(panel->summaryText()));
 
         QVERIFY(project->close());
     }

@@ -3,6 +3,7 @@ eda_add_test(test_project integration)
 eda_add_test(test_kicadimport integration)
 eda_add_test(test_database integration)
 eda_add_test(test_measurements integration)
+eda_add_test(test_diagnostics integration)
 
 # The board fixtures live next to the sources, not in the build directory.
 target_compile_definitions(test_kicadimport PRIVATE
