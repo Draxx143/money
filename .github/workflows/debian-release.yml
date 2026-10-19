@@ -28,7 +28,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-gtk-4.0 xvfb xauth
       - name: Test with GTK 3 and GTK 4 installed
-        run: xvfb-run -a /usr/bin/python3 tests/smoke.py
+        run: |
+          if ! xvfb-run -a /usr/bin/python3 tests/smoke.py > /tmp/smoke.log 2>&1; then
+            cat /tmp/smoke.log
+            while IFS= read -r line; do echo "::error::$line"; done < /tmp/smoke.log
+            exit 1
+          fi
+          cat /tmp/smoke.log
       - name: Build Debian package
         run: sh scripts/build-deb.sh
       - name: Verify package
