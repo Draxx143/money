@@ -6,6 +6,7 @@
 #include "ComponentExplorer.h"
 #include "LogPanel.h"
 #include "SettingsDialog.h"
+#include "TestPointPanel.h"
 #include "Theme.h"
 
 #include "../application/Application.h"
@@ -266,6 +267,21 @@ void MainWindow::createDocks()
     m_docks.append(assistantDock);
     connect(m_assistant, &AssistantPanel::configureRequested, this, [this]() { showSettings(4); });
 
+    m_testPoints = new TestPointPanel(this);
+    m_testPoints->setProject(project());
+    auto *testPointDock = new QDockWidget(tr("Test Points"), this);
+    testPointDock->setObjectName(QStringLiteral("TestPointDock"));
+    testPointDock->setWidget(m_testPoints);
+    addDockWidget(Qt::BottomDockWidgetArea, testPointDock);
+    m_docks.append(testPointDock);
+    connect(m_testPoints, &TestPointPanel::testPointsChanged, this, [this]() {
+        project()->markDirty();
+        updateProjectState();
+    });
+    // A test point is usually taken on the component that is being looked at.
+    connect(m_explorer, &ComponentExplorer::componentSelected, m_testPoints,
+            &TestPointPanel::setContextComponent);
+
     m_logPanel = new LogPanel(this);
     auto *logDock = new QDockWidget(tr("Log"), this);
     logDock->setObjectName(QStringLiteral("LogDock"));
@@ -315,6 +331,7 @@ void MainWindow::connectProjectSignals()
     Project *project = Application::instance()->project();
     connect(project, &Project::opened, this, [this](const QString &path) {
         Application::instance()->settings()->addRecentProject(path);
+        m_testPoints->refresh();
         m_explorer->setBoard(this->project()->primaryBoard());
         m_boardView->setBoard(this->project()->primaryBoard());
         m_details->selectComponent(QString());
@@ -331,6 +348,7 @@ void MainWindow::connectProjectSignals()
         rebuildRecentMenu();
     });
     connect(project, &Project::closed, this, [this]() {
+        m_testPoints->refresh();
         m_explorer->setBoard(nullptr);
         m_boardView->setBoard(nullptr);
         m_details->selectComponent(QString());
@@ -344,6 +362,7 @@ void MainWindow::connectProjectSignals()
         updateProjectState();
     });
     connect(project, &Project::dataChanged, this, [this]() {
+        m_testPoints->refresh();
         m_explorer->setBoard(this->project()->primaryBoard());
         m_boardView->setBoard(this->project()->primaryBoard());
         m_details->refresh();
@@ -693,6 +712,11 @@ void MainWindow::resetWorkspaceLayout()
     addDockWidget(Qt::LeftDockWidgetArea, m_docks.at(0));
     addDockWidget(Qt::RightDockWidgetArea, m_docks.at(1));
     addDockWidget(Qt::BottomDockWidgetArea, m_docks.at(2));
+    // Everything else shares the bottom area as tabs: the explorer and the
+    // details panel are the two panels that are wanted all the time.
+    for (int i = 3; i < m_docks.size(); ++i)
+        tabifyDockWidget(m_docks.at(2), m_docks.at(i));
+    m_docks.at(2)->raise();
     resize(1280, 800);
     logInfo(QStringLiteral("ui"), QStringLiteral("workspace layout reset"));
 }
@@ -833,6 +857,14 @@ void MainWindow::updateProjectState()
     }
     QString text = tr("%1%2").arg(prj->displayName(),
                                   prj->isDirty() ? tr(" (unsaved changes)") : QString());
+    if (m_testPoints != nullptr && !prj->data().testPoints.isEmpty()) {
+        const TestCoverage coverage = m_testPoints->coverage();
+        text += tr("  |  %n test point(s), %1 measured, %2 pass, %3 fail", "",
+                   coverage.testPoints)
+                    .arg(coverage.measured)
+                    .arg(coverage.passing)
+                    .arg(coverage.failing);
+    }
     const Board *board = prj->primaryBoard();
     if (board != nullptr && !board->components.isEmpty()) {
         text += tr("  |  %1 components, %2 nets").arg(board->components.size())

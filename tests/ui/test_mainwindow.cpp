@@ -8,16 +8,19 @@
 #include "../../src/application/AppIdentity.h"
 #include "../../src/application/Application.h"
 #include "../../src/core/Database.h"
+#include "../../src/core/Measurements.h"
 #include "../../src/core/Project.h"
 #include "../../src/ui/BoardView.h"
 #include "../../src/ui/ComponentDetails.h"
 #include "../../src/ui/ComponentExplorer.h"
 #include "../../src/ui/MainWindow.h"
+#include "../../src/ui/TestPointPanel.h"
 #include "../../src/ui/Theme.h"
 #include "../TestEnvironment.h"
 
 #include <QApplication>
 #include <QAction>
+#include <QComboBox>
 #include <QDir>
 #include <QDockWidget>
 #include <QLineEdit>
@@ -580,6 +583,197 @@ private slots:
         QVERIFY(database->removeFact(fact.id));
         details->refresh();
         QCOMPARE(details->factCount(), 0);
+
+        QVERIFY(project->close());
+    }
+
+    void aMeasurementIsComparedWithTheExpectationOfTheTestPoint()
+    {
+        eda::Project *project = projectWithImportedBoard();
+        QVERIFY(project != nullptr);
+        eda::TestPointPanel *panel = m_window->testPointPanel();
+        QVERIFY(panel != nullptr);
+        QCOMPARE(panel->visibleCount(), 0);
+
+        eda::TestPoint point;
+        point.identifier = QStringLiteral("VCC");
+        point.componentUid = project->primaryBoard()->componentByReference(QStringLiteral("C1"))->uid;
+        point.pinOrPad = QStringLiteral("2");
+        point.netName = QStringLiteral("VCC");
+        point.category = QStringLiteral("voltage");
+        point.expectedValue = 5.0;
+        point.hasExpectedValue = true;
+        point.tolerance = 0.25;
+        point.hasTolerance = true;
+        point.unit = QStringLiteral("V");
+        point.testConditions = QStringLiteral("board powered from USB");
+        QString error;
+        const QString uid = panel->addTestPoint(point, &error);
+        QVERIFY2(!uid.isEmpty(), qPrintable(error));
+        QCOMPARE(panel->visibleCount(), 1);
+        QCOMPARE(project->data().testPoints.size(), 1);
+
+        auto *tree = panel->findChild<QTreeWidget *>(QStringLiteral("testpoints.tree"));
+        QVERIFY(tree != nullptr);
+        QCOMPARE(tree->topLevelItemCount(), 1);
+        QCOMPARE(tree->topLevelItem(0)->text(0), QStringLiteral("VCC"));
+        QCOMPARE(tree->topLevelItem(0)->text(1), QStringLiteral("C1"));        // the component
+        QCOMPARE(tree->topLevelItem(0)->text(2), QStringLiteral("VCC"));       // the net
+        QCOMPARE(tree->topLevelItem(0)->text(3), QStringLiteral("5 V +/-0.25"));   // expectation
+        QCOMPARE(tree->topLevelItem(0)->text(5), QStringLiteral("Not tested"));
+
+        // A reading inside the tolerance passes.
+        QVERIFY2(!panel->recordMeasurement(uid, 5.1, QStringLiteral("V"),
+                                           QStringLiteral("Fluke 87V"),
+                                           QStringLiteral("board powered"),
+                                           QStringLiteral("probe on C1 pin 2"), &error)
+                      .isEmpty(),
+                 qPrintable(error));
+        QCOMPARE(panel->coverage().measured, 1);
+        QCOMPARE(panel->coverage().passing, 1);
+        QCOMPARE(panel->coverage().failing, 0);
+        QCOMPARE(tree->topLevelItem(0)->text(4), QStringLiteral("5.1 V"));
+        QCOMPARE(tree->topLevelItem(0)->text(5), QStringLiteral("Pass"));
+
+        // A reading outside the tolerance fails, and it is the newest one that
+        // says what the board does now.
+        QVERIFY(!panel->recordMeasurement(uid, 4.5, QStringLiteral("V"),
+                                          QStringLiteral("Fluke 87V"), QString(), QString(), &error)
+                     .isEmpty());
+        QCOMPARE(panel->coverage().measured, 1);
+        QCOMPARE(panel->coverage().passing, 0);
+        QCOMPARE(panel->coverage().failing, 1);
+        QCOMPARE(tree->topLevelItem(0)->text(4), QStringLiteral("4.5 V"));
+        QCOMPARE(tree->topLevelItem(0)->text(5), QStringLiteral("Fail"));
+
+        // Both readings stay in the history, newest first, each with the reason
+        // for its verdict.
+        auto *history = panel->findChild<QTreeWidget *>(QStringLiteral("testpoints.measurements"));
+        QVERIFY(history != nullptr);
+        QCOMPARE(history->topLevelItemCount(), 2);
+        QCOMPARE(history->topLevelItem(0)->text(1), QStringLiteral("4.5 V"));
+        QCOMPARE(history->topLevelItem(0)->text(2), QStringLiteral("Fail"));
+        QVERIFY2(history->topLevelItem(0)->text(3).contains(QStringLiteral("outside the limits")),
+                 qPrintable(history->topLevelItem(0)->text(3)));
+        QCOMPARE(history->topLevelItem(1)->text(1), QStringLiteral("5.1 V"));
+        QCOMPARE(history->topLevelItem(1)->text(2), QStringLiteral("Pass"));
+        QVERIFY2(history->topLevelItem(1)->text(3).contains(QStringLiteral("inside the limits")),
+                 qPrintable(history->topLevelItem(1)->text(3)));
+
+        // The filter can show only what is broken.
+        auto *filter = panel->findChild<QComboBox *>();
+        QVERIFY(filter != nullptr);
+        filter->setCurrentIndex(2);   // "Failing"
+        QCOMPARE(panel->visibleCount(), 1);
+        filter->setCurrentIndex(3);   // "Passing"
+        QCOMPARE(panel->visibleCount(), 0);
+        filter->setCurrentIndex(0);   // "All"
+        QCOMPARE(panel->visibleCount(), 1);
+
+        QVERIFY(project->close());
+    }
+
+    void aReadingWithoutAnExpectationIsNotJudged()
+    {
+        eda::Project *project = projectWithImportedBoard();
+        QVERIFY(project != nullptr);
+        eda::TestPointPanel *panel = m_window->testPointPanel();
+
+        eda::TestPoint point;
+        point.identifier = QStringLiteral("TP1");
+        point.category = QStringLiteral("resistance");
+        point.unit = QStringLiteral("ohm");
+        // No expected value: nothing to compare against.
+        QString error;
+        const QString uid = panel->addTestPoint(point, &error);
+        QVERIFY2(!uid.isEmpty(), qPrintable(error));
+
+        QVERIFY(!panel->recordMeasurement(uid, 4700.0, QStringLiteral("ohm"), QString(),
+                                          QString(), QString(), &error).isEmpty());
+
+        const eda::Measurement last = eda::latestMeasurement(uid, project->data().measurements);
+        QCOMPARE(eda::toString(last.status),
+                 eda::toString(eda::MeasurementStatus::Unknown));
+        QVERIFY2(eda::measurementExplanation(last).contains(QStringLiteral("cannot pass or fail")),
+                 qPrintable(eda::measurementExplanation(last)));
+
+        // It is measured, but it is neither right nor wrong.
+        const eda::TestCoverage coverage = panel->coverage();
+        QCOMPARE(coverage.measured, 1);
+        QCOMPARE(coverage.passing, 0);
+        QCOMPARE(coverage.failing, 0);
+        QCOMPARE(coverage.unknown, 1);
+
+        auto *tree = panel->findChild<QTreeWidget *>(QStringLiteral("testpoints.tree"));
+        QCOMPARE(tree->topLevelItem(0)->text(5), QStringLiteral("Unknown"));
+
+        // A reading in a unit that means something else is not compared either
+        // -- and it says so, instead of quietly calling it a failure.
+        eda::TestPoint resistance = point;
+        resistance.identifier = QStringLiteral("R1.1");
+        resistance.category = QStringLiteral("resistance");
+        resistance.unit = QStringLiteral("ohm");
+        resistance.expectedValue = 4700.0;
+        resistance.hasExpectedValue = true;
+        const QString resistanceUid = panel->addTestPoint(resistance, &error);
+        QVERIFY2(!resistanceUid.isEmpty(), qPrintable(error));
+        QVERIFY(!panel->recordMeasurement(resistanceUid, 0.1, QStringLiteral("A"), QString(),
+                                          QString(), QString(), &error).isEmpty());
+        const eda::Measurement confusing =
+            eda::latestMeasurement(resistanceUid, project->data().measurements);
+        QCOMPARE(eda::toString(confusing.status),
+                 eda::toString(eda::MeasurementStatus::Unknown));
+        QVERIFY2(eda::measurementExplanation(confusing).contains(QStringLiteral("not compared")),
+                 qPrintable(eda::measurementExplanation(confusing)));
+        QCOMPARE(panel->visibleCount(), 2);
+
+        QVERIFY(project->close());
+    }
+
+    void testPointsAreStoredWithTheProject()
+    {
+        eda::Project *project = projectWithImportedBoard();
+        QVERIFY(project != nullptr);
+        eda::TestPointPanel *panel = m_window->testPointPanel();
+
+        eda::TestPoint point;
+        point.identifier = QStringLiteral("VCC");
+        point.expectedValue = 5.0;
+        point.hasExpectedValue = true;
+        point.tolerance = 5.0;
+        point.hasTolerance = true;
+        point.toleranceIsPercent = true;
+        point.unit = QStringLiteral("V");
+        QString error;
+        const QString uid = panel->addTestPoint(point, &error);
+        QVERIFY(!uid.isEmpty());
+        QVERIFY(!panel->recordMeasurement(uid, 5.05, QStringLiteral("V"), QString(), QString(),
+                                          QString(), &error).isEmpty());
+
+        const QString path = eda::TestEnvironment::root() + QStringLiteral("/testpoints.pwb");
+        QVERIFY2(project->saveAs(path, &error), qPrintable(error));
+        const int testPoints = project->data().testPoints.size();
+        const int measurements = project->data().measurements.size();
+        QCOMPARE(testPoints, 1);
+        QCOMPARE(measurements, 1);
+
+        QVERIFY(project->close());
+        QVERIFY2(project->open(path, &error), qPrintable(error));
+        QCOMPARE(project->data().testPoints.size(), testPoints);
+        QCOMPARE(project->data().measurements.size(), measurements);
+
+        // The panel sees them again, and the percent tolerance came back too.
+        QCOMPARE(panel->visibleCount(), 1);
+        const eda::Measurement last =
+            eda::latestMeasurement(uid, project->data().measurements);
+        QCOMPARE(eda::toString(last.status), eda::toString(eda::MeasurementStatus::Pass));
+        QCOMPARE(last.tolerance, 0.25);   // 5 % of 5 V, remembered in volts
+
+        // A test point can be taken away; its readings are kept.
+        QVERIFY2(panel->removeTestPoint(uid, &error), qPrintable(error));
+        QCOMPARE(panel->visibleCount(), 0);
+        QCOMPARE(project->data().testPoints.size(), 0);
+        QCOMPARE(project->data().measurements.size(), measurements);
 
         QVERIFY(project->close());
     }

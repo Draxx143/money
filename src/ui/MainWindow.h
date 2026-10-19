@@ -25,6 +25,7 @@ class ComponentDetails;
 class ComponentExplorer;
 class LogPanel;
 class Project;
+class TestPointPanel;
 
 class MainWindow : public QMainWindow
 {
@@ -37,6 +38,7 @@ public:
     BoardView *boardView() const { return m_boardView; }
     ComponentExplorer *componentExplorer() const { return m_explorer; }
     ComponentDetails *componentDetails() const { return m_details; }
+    TestPointPanel *testPointPanel() const { return m_testPoints; }
     LogPanel *logPanel() const { return m_logPanel; }
     QAction *action(const QString &objectName) const;
 
@@ -97,6 +99,7 @@ private:
     BoardView *m_boardView = nullptr;
     ComponentExplorer *m_explorer = nullptr;
     ComponentDetails *m_details = nullptr;
+    TestPointPanel *m_testPoints = nullptr;
     AssistantPanel *m_assistant = nullptr;
     LogPanel *m_logPanel = nullptr;
 

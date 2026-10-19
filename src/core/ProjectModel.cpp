@@ -654,6 +654,7 @@ QJsonObject TestPoint::toJson() const
     o.insert(QStringLiteral("hasExpectedValue"), hasExpectedValue);
     o.insert(QStringLiteral("tolerance"), tolerance);
     o.insert(QStringLiteral("hasTolerance"), hasTolerance);
+    o.insert(QStringLiteral("toleranceIsPercent"), toleranceIsPercent);
     o.insert(QStringLiteral("unit"), unit);
     o.insert(QStringLiteral("testConditions"), testConditions);
     o.insert(QStringLiteral("instrument"), instrument);
@@ -678,6 +679,7 @@ TestPoint TestPoint::fromJson(const QJsonObject &json)
     t.hasExpectedValue = json.value(QStringLiteral("hasExpectedValue")).toBool();
     t.tolerance = json.value(QStringLiteral("tolerance")).toDouble();
     t.hasTolerance = json.value(QStringLiteral("hasTolerance")).toBool();
+    t.toleranceIsPercent = json.value(QStringLiteral("toleranceIsPercent")).toBool();
     t.unit = json.value(QStringLiteral("unit")).toString();
     t.testConditions = json.value(QStringLiteral("testConditions")).toString();
     t.instrument = json.value(QStringLiteral("instrument")).toString();
@@ -695,6 +697,7 @@ QJsonObject Measurement::toJson() const
     o.insert(QStringLiteral("timestamp"), timestamp.toString(Qt::ISODate));
     o.insert(QStringLiteral("value"), value);
     o.insert(QStringLiteral("unit"), unit);
+    o.insert(QStringLiteral("expectedUnit"), expectedUnit);
     o.insert(QStringLiteral("expectedValue"), expectedValue);
     o.insert(QStringLiteral("hasExpectedValue"), hasExpectedValue);
     o.insert(QStringLiteral("tolerance"), tolerance);
@@ -716,6 +719,7 @@ Measurement Measurement::fromJson(const QJsonObject &json)
     m.timestamp = QDateTime::fromString(json.value(QStringLiteral("timestamp")).toString(), Qt::ISODate);
     m.value = json.value(QStringLiteral("value")).toDouble();
     m.unit = json.value(QStringLiteral("unit")).toString();
+    m.expectedUnit = json.value(QStringLiteral("expectedUnit")).toString();
     m.expectedValue = json.value(QStringLiteral("expectedValue")).toDouble();
     m.hasExpectedValue = json.value(QStringLiteral("hasExpectedValue")).toBool();
     m.tolerance = json.value(QStringLiteral("tolerance")).toDouble();

@@ -99,7 +99,60 @@ If the file cannot be read — it is not a KiCad board, it is truncated, or it i
 empty — nothing is imported at all. The error message names the file and the
 line where parsing stopped.
 
-## 5. Component details and knowledge
+## 5. Test points and measurements
+
+A test point is a promise: *at this place, with the board in this condition, you
+should read this*. The application keeps that promise separate from what you
+later measured, and it never turns a reading into a verdict it cannot justify.
+
+The **Test points** panel (bottom of the window, next to *Assistant* and *Log*)
+lists every test point with its identifier, component, net, expected value and
+the newest reading. `Add...` asks for:
+
+* an **identifier** – suggested from the component and pin (`C1.2`), never reused;
+* the **component and pad**, and the net it belongs to;
+* a **category** (voltage, resistance, continuity, …) which only sets the unit
+  offered to you;
+* the **expected value**, if you have one, with its unit and an optional
+  tolerance in absolute terms or in percent;
+* the **conditions** the expectation is valid under ("board powered from USB"),
+  the **instrument**, and where to put the probes;
+* where the **expectation came from** — datasheet, schematic, service manual or
+  your own reasoning. Untick *expected* and the test point keeps only a
+  description: it can still be measured, it just cannot pass.
+
+`Measure...` records a reading against the selected test point: value, unit,
+instrument, conditions, notes. The dialog shows the expectation and computes the
+verdict while you type, so you see the reason before you store it.
+
+The verdict is one of four words, and the panel says which one and why:
+
+| Verdict | When |
+| --- | --- |
+| `Not tested` | no reading has been stored |
+| `Pass` | there is an expected value, and the reading is within the tolerance |
+| `Fail` | there is an expected value, and the reading is outside it |
+| `Unknown` | there is **no** expected value, or the reading is in a unit that means something else |
+
+`Unknown` is not a failure and not a hidden pass. The explanation says exactly
+that: *"no expected value was recorded, so this cannot pass or fail"*, or
+*"the measurement is in A but the expectation is in ohm, so they were not
+compared"*. Units are compared by meaning, not by spelling: `mV` and `V` are the
+same quantity, `V` and `A` are not, and values are scaled before the tolerance is
+applied, so 4800 mV against 5 V is a comparison and not a mismatch.
+
+Only the newest reading decides what the board does now; every reading is kept in
+the history below the list, newest first, with its verdict and the reason for it.
+The filter above the list narrows it to *Not tested*, *Failing*, *Passing* or
+*Without a verdict*, and the status line counts how much of the board has
+actually been checked: `"3 test points, 1 measured, 1 pass, 0 fail"`. Deleting a
+test point deletes the promise, not the measurements: the readings stay in the
+project.
+
+Test points and measurements are stored in the project file, so they travel with
+the board and survive save and reload.
+
+## 6. Component details and knowledge
 
 Select a component in the list, or click it on the board, and the **Component
 details** panel shows it in two tabs.
@@ -125,7 +178,7 @@ The knowledge database is a single SQLite file in your data directory
 computer, and `Settings → Database` shows where it is, how large it is, how many
 records and facts it holds, and lets you check and compact it.
 
-## 6. Settings
+## 7. Settings
 
 `Settings → Configure…` opens a nine page dialog:
 
@@ -144,7 +197,7 @@ records and facts it holds, and lets you check and compact it.
 8. **Logging** – log level, how many days of log files are kept.
 9. **Import Options** – defaults applied when a board file is imported.
 
-## 7. Privacy
+## 8. Privacy
 
 Nothing leaves the computer unless you explicitly configure an AI provider and
 enable network access on the *Privacy & Network* page. Both are off by default,

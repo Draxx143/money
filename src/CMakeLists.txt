@@ -12,6 +12,7 @@ add_library(eda_core STATIC
     core/SExpression.cpp
     core/KicadImport.cpp
     core/Database.cpp
+    core/Measurements.cpp
 )
 target_include_directories(eda_core
     PUBLIC
@@ -34,6 +35,7 @@ add_library(eda_ui STATIC
     ui/LogPanel.cpp
     ui/MainWindow.cpp
     ui/SettingsDialog.cpp
+    ui/TestPointPanel.cpp
     ui/Theme.cpp
 )
 target_include_directories(eda_ui

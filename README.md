@@ -56,9 +56,32 @@ Milestone 3 (knowledge base):
 * [x] Tests: 15 database cases (schema, FTS5 search, hostile input, damaged
       file, newer version, reopen) and 3 UI cases for the panel
 
-Measurements, test points, the diagnostic engine and the optional AI assistant
-follow in later milestones. They are not advertised as working today, and there
-is no menu entry for them yet.
+Milestone 4 (test points and measurements):
+
+* [x] Test points in the project: identifier, component and pad, net, category,
+      expected value with a tolerance in absolute terms or in percent, the
+      conditions, the instrument, where to put the probes and the source of the
+      expectation
+* [x] Measurements stored per test point, with instrument, conditions and notes;
+      the whole history is kept, the newest one decides the current verdict
+* [x] Honest verdicts: `Pass` and `Fail` only where an expected value exists;
+      `Unknown` with a reason when there is none or when the units mean
+      different things; `Not tested` when nothing was measured yet. Nothing is
+      invented, and a missing expectation is never reported as a pass or a fail
+* [x] Units are compared by meaning (mV and V are the same quantity, V and A are
+      not) and values are scaled into the unit of the expectation before the
+      tolerance is applied
+* [x] Test points panel: list with the expected value and the newest reading,
+      filter, history with the reason for each verdict, and a coverage line
+      counting what has really been measured
+* [x] Test points and measurements are saved with the project
+* [x] Tests: 14 measurement cases (tolerances, edges, percent, units, coverage,
+      coverage of what was not measured, round trip through the project) and 3
+      UI cases for the panel
+
+The diagnostic engine and the optional AI assistant follow in later milestones.
+They are not advertised as working today, and there is no menu entry for them
+yet.
 
 ## Building
 

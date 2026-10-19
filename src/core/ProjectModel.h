@@ -251,6 +251,7 @@ struct TestPoint
     bool hasExpectedValue = false;
     double tolerance = 0.0;
     bool hasTolerance = false;
+    bool toleranceIsPercent = false; // "5 %" instead of "0,25 V"
     QString unit;
     QString testConditions;        // "board powered, 24 V applied"
     QString instrument;            // "Fluke 87V"
@@ -269,6 +270,10 @@ struct Measurement
     QDateTime timestamp;
     double value = 0.0;
     QString unit;
+    // The unit the expectation was written in is stored as well: a measurement
+    // taken in mV against a 5 V expectation has to stay explainable later,
+    // after the test point may have been changed.
+    QString expectedUnit;
     double expectedValue = 0.0;
     bool hasExpectedValue = false;
     double tolerance = 0.0;
