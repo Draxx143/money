@@ -1,0 +1,41 @@
+# Build directories
+build/
+build-*/
+out/
+dist/
+
+# Provisioned toolchain and downloaded artefacts (see scripts/toolchain/).
+# These are large, machine specific and regenerated on demand:
+#   external/qt-runtime, external/qtbase and external/venv are symlinks to the
+#   real locations outside the source tree in a development container.
+external/
+!external/.gitkeep
+
+# Editor and OS noise
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CPackConfig.cmake
+CPackSourceConfig.cmake
+CTestTestfile.cmake
+Testing/
+compile_commands.json
+install_manifest.txt
+
+# Compiled output
+*.o
+*.obj
+*.so
+*.so.*
+*.a
+*.moc
+moc_*.cpp
+ui_*.h
+qrc_*.cpp

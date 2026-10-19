@@ -1,0 +1,20 @@
+#!/bin/sh
+# Launcher for the packaged application.
+#
+# The Qt libraries this build of @PROJECT_NAME@ was linked against live in
+# @CMAKE_INSTALL_PREFIX@/@EDA_BUNDLE_LIB_DIR@ instead of in the system library
+# path, so that the package does not depend on the exact Qt version installed on
+# the machine.  Pointing the dynamic linker and Qt at that directory is all this
+# script does; the application itself is started unchanged, and every argument
+# and exit status is passed through.
+set -e
+
+prefix="@CMAKE_INSTALL_PREFIX@"
+
+LD_LIBRARY_PATH="$prefix/@EDA_BUNDLE_LIB_DIR@${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH
+
+QT_PLUGIN_PATH="$prefix/@EDA_BUNDLE_PLUGIN_DIR@"
+export QT_PLUGIN_PATH
+
+exec "$prefix/@EDA_BUNDLE_BIN_DIR@/pcb-workbench" "$@"

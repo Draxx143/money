@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=PCB Workbench
+GenericName=PCB Analysis Workbench
+Comment=Analyse PCB designs and imported board data, and document diagnostics
+Exec=pcb-workbench %f
+Icon=pcb-workbench
+Terminal=false
+Categories=Development;Electronics;Engineering;Science;
+Keywords=pcb;electronics;diagnostics;repair;kicad;boardview;
+MimeType=application/x-pcb-workbench-project;
+StartupNotify=true
+StartupWMClass=pcb-workbench

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Neutral placeholder artwork: a board outline with two pin rows and a trace.
+     The application also draws its own icon at runtime from the accent colours
+     chosen in the settings, so this file is only the static, theme independent
+     fallback used by the window manager. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="board" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18222E"/>
+      <stop offset="1" stop-color="#0B0F14"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="224" height="224" rx="28" ry="28" fill="url(#board)" stroke="#283544" stroke-width="6"/>
+  <g fill="#00D1B2">
+    <circle cx="72" cy="70" r="10"/>
+    <circle cx="72" cy="104" r="10"/>
+    <circle cx="72" cy="138" r="10"/>
+    <circle cx="72" cy="172" r="10"/>
+    <circle cx="184" cy="70" r="10"/>
+    <circle cx="184" cy="104" r="10"/>
+    <circle cx="184" cy="138" r="10"/>
+    <circle cx="184" cy="172" r="10"/>
+  </g>
+  <g fill="none" stroke="#4DA3FF" stroke-width="8" stroke-linecap="round">
+    <path d="M88 70 H132 V138 H168"/>
+    <path d="M88 172 H120 V104"/>
+  </g>
+  <rect x="104" y="126" width="48" height="24" rx="4" fill="#F1F5F9" opacity="0.85"/>
+</svg>

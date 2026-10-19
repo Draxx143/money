@@ -1,0 +1,17 @@
+(kicad_pcb
+  (version 20221018)
+  (generator pcbnew)
+  (layers
+    (0 "F.Cu" signal)
+    (31 "B.Cu" signal)
+    (44 "Edge.Cuts" user)
+  )
+  (net 0 "")
+  (net 1 "GND")
+  (gr_line (start 0 0) (end 40 0) (layer "Edge.Cuts"))
+  (gr_arc (start 40 0) (mid 45 5) (end 40 10) (layer "Edge.Cuts"))
+  (gr_line (start 40 10) (end 0 10) (layer "Edge.Cuts"))
+  (gr_line (start 0 10) (end 0 0) (layer "Edge.Cuts"))
+  (gr_circle (center 20 5) (end 22 5) (layer "Edge.Cuts"))
+  (segment (start 5 5) (end 35 5) (width 0.2) (layer "F.Cu") (net 1))
+)
