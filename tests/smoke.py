@@ -7,7 +7,7 @@ import runpy
 from pathlib import Path
 from types import SimpleNamespace
 
-app = runpy.run_path(str(Path(__file__).resolve().parents[1] / "src/indigo-screen"))
+app = runpy.run_path(str(Path(__file__).resolve().parents[1] / "src/indigo-screen"), run_name="indigo_screen")
 Gdk, Gtk = app["Gdk"], app["Gtk"]
 assert Gdk._version == "3.0"
 assert Gtk._version == "3.0"
