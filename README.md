@@ -4,10 +4,10 @@
 
 ## نصب روی اوبونتو
 
-فایل `indigo-screen_1.0.0_all.deb` را دانلود کنید و در پوشهٔ دانلودشده اجرا کنید:
+فایل `indigo-screen_1.0.1_all.deb` را دانلود کنید و در پوشهٔ دانلودشده اجرا کنید:
 
 ```sh
-sudo apt install ./indigo-screen_1.0.0_all.deb
+sudo apt install ./indigo-screen_1.0.1_all.deb
 ```
 
 سپس از فهرست برنامه‌ها **Indigo Screen / صفحهٔ نیلی** را باز کنید یا دستور زیر را اجرا کنید:
@@ -26,7 +26,7 @@ indigo-screen
 sh scripts/build-deb.sh
 ```
 
-خروجی: `dist/indigo-screen_1.0.0_all.deb`
+خروجی: `dist/indigo-screen_1.0.1_all.deb`
 
 ## حذف
 

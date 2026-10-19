@@ -23,16 +23,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install GUI test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi gir1.2-gtk-3.0 gir1.2-gtk-4.0 xvfb xauth
+      - name: Test with GTK 3 and GTK 4 installed
+        run: xvfb-run -a /usr/bin/python3 -W error tests/smoke.py
       - name: Build Debian package
         run: sh scripts/build-deb.sh
       - name: Verify package
         run: |
-          dpkg-deb --info dist/indigo-screen_1.0.0_all.deb
-          dpkg-deb --contents dist/indigo-screen_1.0.0_all.deb
+          dpkg-deb --info dist/indigo-screen_1.0.1_all.deb
+          dpkg-deb --contents dist/indigo-screen_1.0.1_all.deb
       - name: Upload package to existing release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release view v1.0.0
-          gh release upload v1.0.0 dist/indigo-screen_1.0.0_all.deb --clobber
+          gh release view v1.0.1
+          gh release upload v1.0.1 dist/indigo-screen_1.0.1_all.deb --clobber

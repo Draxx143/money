@@ -8,7 +8,7 @@ chmod 755 "$STAGING"
 mkdir -p "$OUTPUT" "$STAGING/DEBIAN" "$STAGING/usr/bin" "$STAGING/usr/share/applications"
 cat > "$STAGING/DEBIAN/control" <<'EOF'
 Package: indigo-screen
-Version: 1.0.0
+Version: 1.0.1
 Section: graphics
 Priority: optional
 Architecture: all
@@ -20,4 +20,4 @@ Description: A plain fullscreen indigo display
 EOF
 install -m 755 "$ROOT/src/indigo-screen" "$STAGING/usr/bin/indigo-screen"
 install -m 644 "$ROOT/packaging/indigo-screen.desktop" "$STAGING/usr/share/applications/indigo-screen.desktop"
-dpkg-deb --root-owner-group --build "$STAGING" "$OUTPUT/indigo-screen_1.0.0_all.deb"
+dpkg-deb --root-owner-group --build "$STAGING" "$OUTPUT/indigo-screen_1.0.1_all.deb"
