@@ -1,0 +1,101 @@
+// Main window: menus, toolbars, dockable panels, status bar and workspace
+// persistence. Every menu entry is wired to an operation that exists; controls
+// for features that are not implemented yet are simply not created.
+#pragma once
+
+#include <QMainWindow>
+
+#include "../core/ProjectModel.h"
+
+#include <QHash>
+#include <QList>
+
+class QAction;
+class QDockWidget;
+class QLabel;
+class QMenu;
+class QProgressBar;
+class QSettings;
+
+namespace eda {
+
+class AssistantPanel;
+class BoardView;
+class ComponentExplorer;
+class LogPanel;
+class Project;
+
+class MainWindow : public QMainWindow
+{
+    Q_OBJECT
+public:
+    explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
+
+    // Test and automation hooks.
+    BoardView *boardView() const { return m_boardView; }
+    ComponentExplorer *componentExplorer() const { return m_explorer; }
+    LogPanel *logPanel() const { return m_logPanel; }
+    QAction *action(const QString &objectName) const;
+
+    // Background task feedback (owned by the window, used by long operations).
+    void beginTask(const QString &description);
+    void setTaskProgress(int percent);
+    void endTask();
+
+public slots:
+    void newProject();
+    void openProject();
+    void openProjectPath(const QString &path);
+    bool saveProject();
+    bool saveProjectAs();
+    bool closeProject();
+    void showSettings(int pageIndex = 0);
+    void showAbout();
+    void showAboutQt();
+    void openUserManual();
+    void openLogDirectory();
+    void findComponent();
+    void resetWorkspaceLayout();
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
+private:
+    bool maybeSave();
+    void createActions();
+    void createMenus();
+    void createToolbars();
+    void createDocks();
+    void createStatusBar();
+    void restoreWorkspace();
+    void saveWorkspace();
+    void updateWindowTitle();
+    void updateActionStates();
+    void updateProjectState();
+    void connectProjectSignals();
+    void offerRecovery();
+    void rebuildRecentMenu();
+    QString projectDirectory() const;
+
+    Project *project() const;
+
+    BoardView *m_boardView = nullptr;
+    ComponentExplorer *m_explorer = nullptr;
+    AssistantPanel *m_assistant = nullptr;
+    LogPanel *m_logPanel = nullptr;
+
+    QMenu *m_recentMenu = nullptr;
+    QLabel *m_projectState = nullptr;
+    QLabel *m_sideState = nullptr;
+    QLabel *m_modelState = nullptr;
+    QLabel *m_coordinateState = nullptr;
+    QProgressBar *m_taskProgress = nullptr;
+    QAction *m_taskAction = nullptr;
+
+    QList<QDockWidget *> m_docks;
+    QMenu *m_panelMenu = nullptr;
+    QHash<QString, QAction *> m_actions;
+};
+
+} // namespace eda
