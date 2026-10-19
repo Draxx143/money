@@ -7,5 +7,6 @@ target_include_directories(eda_testsupport PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/..
 eda_add_test(test_logging unit)
 eda_add_test(test_settings unit)
 eda_add_test(test_projectmodel unit)
+eda_add_test(test_sexpression unit)
 eda_add_test(test_paths unit)
 eda_add_test(test_appidentity unit)

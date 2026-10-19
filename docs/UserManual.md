@@ -37,9 +37,12 @@ The window is a classic workbench with dockable panels:
   by category and by board side. The row count under the list always tells you
   how many components are currently visible, so a filtered view can never be
   mistaken for the whole board.
-* **Board** (centre) – the board view. Mouse wheel zooms, dragging pans,
-  `Fit` / `1:1` restore the view. The status bar shows the cursor position in
-  millimetres and the current zoom factor.
+* **Board** (centre) – the board view. Dragging pans, the mouse wheel scrolls,
+  `Ctrl` + wheel zooms at the cursor, `View → Zoom In/Out`, `Fit Board to View`
+  (`F`) and `Reset View` (`0`) control the zoom. `View → Show Board Back` (`B`)
+  mirrors the board the way it looks when you turn it over; the designators stay
+  readable and the board data is not modified. The status bar shows the cursor
+  position in millimetres, the current zoom factor and which side is shown.
 * **Assistant** (right) – the status of the optional AI features. Until a
   provider is configured it says so plainly and lists which diagnostic features
   work completely offline.
@@ -61,7 +64,39 @@ whether to keep them; on the next start the application offers to restore the
 recovered data. A restored project is always marked as modified, so `Save` can
 never silently overwrite the file on disk.
 
-## 4. Settings
+## 4. Importing a board
+
+`File → Import Board File…` (`Ctrl+I`) reads a KiCad board file (`.kicad_pcb`)
+into the open project. A board always belongs to a project: the notes, test
+points and measurements you add are stored next to it, and the import is
+recorded in the project so that you can see where the data came from.
+
+What is read, and what is deliberately left out, is listed in
+[supported_formats.md](supported_formats.md#kicad-board-files). The short
+version: layers, nets, footprints, pads, tracks, vias and the board outline are
+imported; zones, silkscreen and fabrication drawings, text and 3D models are
+not, and every one of them is named in a warning.
+
+Importing a second board replaces the board of the project. The components of
+the new board are a fresh set, so notes that were attached to the previous board
+are not silently carried over.
+
+After an import:
+
+* the **Components** panel lists every footprint, with its reference, value and
+  side as the file gave them (a component the file does not name has no name
+  here either);
+* the **Board** panel draws the board outline, the copper tracks, the vias and
+  every pad in its real shape, at its real position;
+* the **status bar** reports the board: `project name | 34 components, 32 nets |
+  board file`;
+* the **Log** panel lists everything that was skipped, one line per kind.
+
+If the file cannot be read — it is not a KiCad board, it is truncated, or it is
+empty — nothing is imported at all. The error message names the file and the
+line where parsing stopped.
+
+## 5. Settings
 
 `Settings → Configure…` opens a nine page dialog:
 
@@ -80,7 +115,7 @@ never silently overwrite the file on disk.
 8. **Logging** – log level, how many days of log files are kept.
 9. **Import Options** – defaults applied when a board file is imported.
 
-## 5. Privacy
+## 6. Privacy
 
 Nothing leaves the computer unless you explicitly configure an AI provider and
 enable network access on the *Privacy & Network* page. Both are off by default,

@@ -142,6 +142,33 @@ ComponentCategory componentCategoryFromString(const QString &text)
     return ComponentCategory::Unknown;
 }
 
+QString toString(PadShape shape)
+{
+    switch (shape) {
+    case PadShape::Unknown: return QStringLiteral("unknown");
+    case PadShape::Rectangle: return QStringLiteral("rect");
+    case PadShape::Circle: return QStringLiteral("circle");
+    case PadShape::Oval: return QStringLiteral("oval");
+    case PadShape::RoundedRectangle: return QStringLiteral("roundrect");
+    case PadShape::Trapezoid: return QStringLiteral("trapezoid");
+    case PadShape::Custom: return QStringLiteral("custom");
+    }
+    return QStringLiteral("unknown");
+}
+
+PadShape padShapeFromString(const QString &text)
+{
+    const QString t = text.trimmed().toLower();
+    if (t == QLatin1String("rect") || t == QLatin1String("rectangle")) return PadShape::Rectangle;
+    if (t == QLatin1String("circle") || t == QLatin1String("round")) return PadShape::Circle;
+    if (t == QLatin1String("oval") || t == QLatin1String("ellipse")) return PadShape::Oval;
+    if (t == QLatin1String("roundrect") || t == QLatin1String("rounded_rectangle"))
+        return PadShape::RoundedRectangle;
+    if (t == QLatin1String("trapezoid")) return PadShape::Trapezoid;
+    if (t == QLatin1String("custom")) return PadShape::Custom;
+    return PadShape::Unknown;
+}
+
 QString toString(LayerType type)
 {
     switch (type) {
@@ -328,6 +355,8 @@ QJsonObject Pad::toJson() const
     o.insert(QStringLiteral("pinName"), pinName);
     o.insert(QStringLiteral("position"), pointToJson(position));
     o.insert(QStringLiteral("size"), sizeToJson(size));
+    o.insert(QStringLiteral("rotation"), rotation);
+    o.insert(QStringLiteral("shape"), eda::toString(shape));
     o.insert(QStringLiteral("side"), eda::toString(side));
     o.insert(QStringLiteral("net"), netName);
     return o;
@@ -341,6 +370,8 @@ Pad Pad::fromJson(const QJsonObject &json)
     p.pinName = json.value(QStringLiteral("pinName")).toString();
     p.position = pointFromJson(json.value(QStringLiteral("position")).toObject());
     p.size = sizeFromJson(json.value(QStringLiteral("size")).toObject());
+    p.rotation = json.value(QStringLiteral("rotation")).toDouble();
+    p.shape = padShapeFromString(json.value(QStringLiteral("shape")).toString());
     p.side = boardSideFromString(json.value(QStringLiteral("side")).toString());
     p.netName = json.value(QStringLiteral("net")).toString();
     return p;

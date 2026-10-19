@@ -44,6 +44,13 @@ public:
     void endTask();
 
 public slots:
+    // Importing a board file. The overload that takes a path does the work and
+    // reports failure through <error>; it never opens a dialog, so it can be
+    // driven from a script or a test. The overload without arguments asks for a
+    // file and is the one that talks to the user.
+    bool importBoardFile(const QString &path, QString *error = nullptr);
+    void importBoardFile();
+
     void newProject();
     void openProject();
     void openProjectPath(const QString &path);
@@ -57,6 +64,7 @@ public slots:
     void openLogDirectory();
     void findComponent();
     void resetWorkspaceLayout();
+    void showBoardSide(eda::BoardSide side);
 
 protected:
     void closeEvent(QCloseEvent *event) override;

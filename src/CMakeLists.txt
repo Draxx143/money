@@ -9,6 +9,8 @@ add_library(eda_core STATIC
     core/Paths.cpp
     core/ProjectModel.cpp
     core/Project.cpp
+    core/SExpression.cpp
+    core/KicadImport.cpp
 )
 target_include_directories(eda_core
     PUBLIC

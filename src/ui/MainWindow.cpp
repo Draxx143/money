@@ -10,6 +10,7 @@
 #include "../application/Application.h"
 #include "../application/AppIdentity.h"
 #include "../application/Settings.h"
+#include "../core/KicadImport.h"
 #include "../core/Logging.h"
 #include "../core/Paths.h"
 #include "../core/Project.h"
@@ -23,6 +24,7 @@
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
+#include <QFileInfo>
 #include <QInputDialog>
 #include <QLabel>
 #include <QMenu>
@@ -31,6 +33,7 @@
 #include <QProgressBar>
 #include <QSettings>
 #include <QStatusBar>
+#include <QUuid>
 #include <QToolBar>
 #include <QUrl>
 
@@ -90,6 +93,8 @@ void MainWindow::createActions()
         [this]() { newProject(); });
     add(QStringLiteral("file.open"), tr("&Open Project..."), tr("Open"), QKeySequence::Open,
         [this]() { openProject(); });
+    add(QStringLiteral("file.importBoard"), tr("&Import Board File..."), tr("Import"),
+        QKeySequence(Qt::ControlModifier | Qt::Key_I), [this]() { importBoardFile(); });
     add(QStringLiteral("file.save"), tr("&Save"), tr("Save"), QKeySequence::Save,
         [this]() { saveProject(); });
     add(QStringLiteral("file.saveAs"), tr("Save &As..."), tr("Save As"), QKeySequence::SaveAs,
@@ -112,6 +117,12 @@ void MainWindow::createActions()
         QKeySequence(Qt::Key_F), [this]() { m_boardView->fitToBoard(); });
     add(QStringLiteral("view.reset"), tr("Reset View"), QStringLiteral("1:1"), QKeySequence(Qt::Key_0),
         [this]() { m_boardView->resetView(); });
+    auto *backSide = add(QStringLiteral("view.sideBottom"), tr("Show Board &Back"), QString(),
+                         QKeySequence(Qt::Key_B), [this](bool checked) {
+                             showBoardSide(checked ? BoardSide::Bottom : BoardSide::Top);
+                         });
+    backSide->setCheckable(true);
+    backSide->setToolTip(tr("Mirror the board the way it looks when you turn it over."));
     add(QStringLiteral("view.resetLayout"), tr("Reset Workspace Layout"), QString(), QKeySequence(),
         [this]() { resetWorkspaceLayout(); });
 
@@ -140,6 +151,8 @@ void MainWindow::createMenus()
     fileMenu->addAction(m_actions.value(QStringLiteral("file.open")));
     m_recentMenu = fileMenu->addMenu(tr("Open &Recent"));
     fileMenu->addSeparator();
+    fileMenu->addAction(m_actions.value(QStringLiteral("file.importBoard")));
+    fileMenu->addSeparator();
     fileMenu->addAction(m_actions.value(QStringLiteral("file.save")));
     fileMenu->addAction(m_actions.value(QStringLiteral("file.saveAs")));
     fileMenu->addSeparator();
@@ -156,6 +169,7 @@ void MainWindow::createMenus()
     viewMenu->addAction(m_actions.value(QStringLiteral("view.zoomOut")));
     viewMenu->addAction(m_actions.value(QStringLiteral("view.fit")));
     viewMenu->addAction(m_actions.value(QStringLiteral("view.reset")));
+    viewMenu->addAction(m_actions.value(QStringLiteral("view.sideBottom")));
     viewMenu->addSeparator();
     auto *panels = viewMenu->addMenu(tr("Panels"));
     viewMenu->addSeparator();
@@ -186,6 +200,7 @@ void MainWindow::createToolbars()
     toolbar->setMovable(true);
     toolbar->addAction(m_actions.value(QStringLiteral("file.new")));
     toolbar->addAction(m_actions.value(QStringLiteral("file.open")));
+    toolbar->addAction(m_actions.value(QStringLiteral("file.importBoard")));
     toolbar->addAction(m_actions.value(QStringLiteral("file.save")));
     toolbar->addSeparator();
     toolbar->addAction(m_actions.value(QStringLiteral("view.zoomIn")));
@@ -251,7 +266,7 @@ void MainWindow::createStatusBar()
     m_projectState->setMinimumWidth(200);
     statusBar()->addWidget(m_projectState, 1);
 
-    m_sideState = new QLabel(tr("Side: -"), this);
+    m_sideState = new QLabel(tr("Side: %1").arg(tr("front")), this);
     statusBar()->addPermanentWidget(m_sideState);
 
     m_coordinateState = new QLabel(tr("X 0.00 mm  Y 0.00 mm"), this);
@@ -351,6 +366,99 @@ void MainWindow::openProjectPath(const QString &path)
         QMessageBox::critical(this, tr("Open Project"), error);
         return;
     }
+}
+
+void MainWindow::importBoardFile()
+{
+    if (!project()->isOpen()) {
+        QMessageBox::information(this, tr("Import Board File"),
+                                 tr("Create or open a project first: an imported board is stored "
+                                    "inside a project, together with the notes and measurements "
+                                    "that belong to it."));
+        return;
+    }
+
+    const QString path = QFileDialog::getOpenFileName(this, tr("Import Board File"),
+                                                      projectDirectory(), eda::kicadBoardFileFilter());
+    if (path.isEmpty())
+        return;
+    QString error;
+    if (!importBoardFile(path, &error)) {
+        QMessageBox::critical(this, tr("Import Board File"),
+                              tr("The board file could not be imported.\n\n%1\n\n%2")
+                                  .arg(QDir::toNativeSeparators(path), error));
+    }
+}
+
+bool MainWindow::importBoardFile(const QString &path, QString *error)
+{
+    if (path.isEmpty())
+        return false;
+    Project *prj = project();
+    if (!prj->isOpen()) {
+        if (error)
+            *error = tr("There is no open project to import into.");
+        return false;
+    }
+
+    const QFileInfo info(path);
+    beginTask(tr("Importing %1").arg(info.fileName()));
+    QString importError;
+    const KicadImportResult result = importKicadPcb(path, &importError);
+    endTask();
+
+    if (!result.ok) {
+        logError(QStringLiteral("import"),
+                 tr("Could not import %1: %2").arg(info.fileName(), importError));
+        if (error)
+            *error = importError;
+        return false;
+    }
+    if (error)
+        error->clear();
+
+    Board board = result.board;
+    // The importer reads geometry; anything it could not read is listed in the
+    // board's warnings, and the user sees them here.
+    for (const QString &warning : board.warnings)
+        logWarning(QStringLiteral("import"), tr("%1: %2").arg(info.fileName(), warning));
+
+    ImportedDocument document;
+    document.uid = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    document.path = path;
+    document.format = board.sourceFormat;
+    document.title = board.name.isEmpty() ? info.fileName() : board.name;
+    document.imported = QDateTime::currentDateTimeUtc();
+    document.warnings = board.warnings;
+
+    if (prj->primaryBoard() == nullptr)
+        prj->data().boards.append(board);
+    else
+        *prj->primaryBoard() = board;
+    prj->data().documents.append(document);
+    prj->markDirty();
+
+    m_explorer->setBoard(prj->primaryBoard());
+    m_boardView->setBoard(prj->primaryBoard());
+    m_boardView->fitToBoard();
+    updateProjectState();
+    updateActionStates();
+
+    statusBar()->showMessage(
+        tr("Imported %1: %2 components, %3 pads, %4 nets, %5 tracks%6")
+            .arg(info.fileName())
+            .arg(result.componentCount)
+            .arg(result.padCount)
+            .arg(prj->primaryBoard()->nets.size())
+            .arg(result.trackCount)
+            .arg(board.warnings.isEmpty()
+                     ? QString()
+                     : tr(" (%n thing(s) in the file were not imported, see the log)", "",
+                          board.warnings.size())),
+        10000);
+    logInfo(QStringLiteral("import"),
+            tr("Imported %1 (%2 components)").arg(path).arg(result.componentCount));
+    return true;
 }
 
 bool MainWindow::saveProject()
@@ -609,13 +717,26 @@ void MainWindow::updateWindowTitle()
     setWindowTitle(Application::instance()->identity()->windowTitle(document));
 }
 
+void MainWindow::showBoardSide(BoardSide side)
+{
+    m_boardView->setSide(side);
+    QAction *action = m_actions.value(QStringLiteral("view.sideBottom"));
+    if (action)
+        action->setChecked(side == BoardSide::Bottom);
+    m_sideState->setText(tr("Side: %1").arg(side == BoardSide::Bottom ? tr("back")
+                                                                     : tr("front")));
+}
+
 void MainWindow::updateActionStates()
 {
     const bool open = project()->isOpen();
     m_actions.value(QStringLiteral("file.save"))->setEnabled(open);
     m_actions.value(QStringLiteral("file.saveAs"))->setEnabled(open);
     m_actions.value(QStringLiteral("file.close"))->setEnabled(open);
+    m_actions.value(QStringLiteral("file.importBoard"))->setEnabled(open);
     m_actions.value(QStringLiteral("edit.findComponent"))->setEnabled(open);
+    m_actions.value(QStringLiteral("view.sideBottom"))
+        ->setEnabled(m_boardView != nullptr && m_boardView->board() != nullptr);
     rebuildRecentMenu();
 }
 
@@ -626,8 +747,20 @@ void MainWindow::updateProjectState()
         m_projectState->setText(tr("No project open"));
         return;
     }
-    m_projectState->setText(tr("%1%2").arg(prj->displayName(),
-                                           prj->isDirty() ? tr(" (unsaved changes)") : QString()));
+    QString text = tr("%1%2").arg(prj->displayName(),
+                                  prj->isDirty() ? tr(" (unsaved changes)") : QString());
+    const Board *board = prj->primaryBoard();
+    if (board != nullptr && !board->components.isEmpty()) {
+        text += tr("  |  %1 components, %2 nets").arg(board->components.size())
+                                                  .arg(board->nets.size());
+        if (!board->sourcePath.isEmpty())
+            text += tr("  |  %1").arg(QFileInfo(board->sourcePath).fileName());
+    } else if (board != nullptr && !board->sourcePath.isEmpty()) {
+        text += tr("  |  %1 (no components)").arg(QFileInfo(board->sourcePath).fileName());
+    } else {
+        text += tr("  |  no board imported");
+    }
+    m_projectState->setText(text);
 }
 
 QString MainWindow::projectDirectory() const

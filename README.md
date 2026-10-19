@@ -24,9 +24,25 @@ Milestone 1 (desktop foundation):
 * [x] Automated tests (unit, integration, UI) with `ctest`
 * [x] `.deb` package
 
-Board file import, the knowledge database, measurements, the diagnostic engine
-and the optional AI assistant follow in later milestones. They are not advertised
-as working today, and there is no menu entry for them yet.
+Milestone 2 (real board import):
+
+* [x] KiCad `.kicad_pcb` importer: layers, nets, footprints, pads (with shape,
+      rotation and side), tracks, vias and the board outline
+* [x] A strict s-expression reader that reports the line and column of a syntax
+      error instead of importing a half-read file
+* [x] Board outline built from `Edge.Cuts`: lines, rectangles, polygons, arcs and
+      circles, joined into closed loops
+* [x] Real geometry in the board view: substrate, outline, tracks, vias, pads in
+      their own shape, and one clickable group per component
+* [x] `File → Import Board File…`, `View → Show Board Back`
+* [x] Every skipped element (zones, silkscreen, text, 3D models) is reported as a
+      warning on the board and in the log; nothing is invented
+* [x] Tests: s-expression reader, importer, and the whole path from a file to the
+      explorer and the viewer
+
+The knowledge database, measurements, the diagnostic engine and the optional AI
+assistant follow in later milestones. They are not advertised as working today,
+and there is no menu entry for them yet.
 
 ## Building
 

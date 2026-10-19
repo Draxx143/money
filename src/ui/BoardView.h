@@ -41,6 +41,11 @@ public:
     void zoomIn();
     void zoomOut();
 
+    // Which component is drawn at this position, in board millimetres. Empty
+    // when there is none. The same test the mouse uses, so a test can check the
+    // geometry the user sees.
+    QString componentAt(const QPointF &scenePosition) const;
+
     // Highlights used by the diagnostic workflow.
     QString selectedComponentUid() const { return m_selectedUid; }
     void setSelectedComponent(const QString &uid);
@@ -61,9 +66,16 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
 
 private:
+    // One footprint in the scene: its pads, its body and its reference. Defined
+    // in BoardView.cpp because it is an implementation detail of the view.
+    class ComponentItem;
+
     void rebuildScene();
     void applyTransform();
-    QString componentAt(const QPointF &scenePosition) const;
+    void applyHighlight();
+    // Keeps the reference designators readable while the board is mirrored:
+    // the geometry is mirrored, the text is not.
+    void applyLabelMirroring();
 
     const Board *m_board = nullptr;
     QGraphicsSimpleTextItem *m_placeholder = nullptr;

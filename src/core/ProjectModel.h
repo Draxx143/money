@@ -27,6 +27,8 @@ enum class ComponentCategory { Unknown = 0, Resistor, Capacitor, Inductor, Diode
                                IntegratedCircuit, Connector, Crystal, Fuse, Relay, Transformer,
                                Led, Switch, TestPoint, Mechanical, Other };
 enum class LayerType { Unknown = 0, Copper, Silkscreen, SolderMask, Paste, Edge, Fabrication, Other };
+// Physical shape of a pad, exactly as named by the source format.
+enum class PadShape { Unknown = 0, Rectangle, Circle, Oval, RoundedRectangle, Trapezoid, Custom };
 
 // How trustworthy a piece of information is.
 enum class VerificationStatus {
@@ -62,6 +64,8 @@ QString toString(ComponentCategory category);
 ComponentCategory componentCategoryFromString(const QString &text);
 QString toString(LayerType type);
 LayerType layerTypeFromString(const QString &text);
+QString toString(PadShape shape);
+PadShape padShapeFromString(const QString &text);
 QString toString(VerificationStatus status);
 VerificationStatus verificationStatusFromString(const QString &text);
 QString toString(ValueSource source);
@@ -118,6 +122,8 @@ struct Pad
     QString pinName;               // electrical name if known (e.g. "VCC")
     Point2D position;              // relative to the component origin, mm
     Size2D size;                   // mm
+    double rotation = 0.0;         // degrees, in the component's frame
+    PadShape shape = PadShape::Unknown;
     BoardSide side = BoardSide::Unknown;
     QString netName;               // empty when unknown
 

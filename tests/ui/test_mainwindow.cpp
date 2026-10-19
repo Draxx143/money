@@ -16,7 +16,9 @@
 
 #include <QApplication>
 #include <QAction>
+#include <QDir>
 #include <QDockWidget>
+#include <QGraphicsItem>
 #include <QLabel>
 #include <QMenuBar>
 #include <QStatusBar>
@@ -80,6 +82,10 @@ private slots:
         eda::Project *project = eda::Application::instance()->project();
         QString error;
         QVERIFY(project->create(QStringLiteral("menu test"), eda::TestEnvironment::root(), &error));
+        // A board is imported as well: the workbench is used with a board
+        // loaded, and an action that needs one has to work in that state.
+        QVERIFY(m_window->importBoardFile(boardFixture(QStringLiteral("led-blink.kicad_pcb")),
+                                          &error));
 
         int checked = 0;
         for (QAction *menuAction : m_window->menuBar()->actions()) {
@@ -231,6 +237,198 @@ private slots:
         eda::applyTheme(qApp, other);
         QCOMPARE(QApplication::palette().color(QPalette::Highlight), QColor(QStringLiteral("#FF0000")));
         eda::applyTheme(qApp, colors);
+    }
+
+    // The fixture lives next to the sources; it is a real KiCad board file, so
+    // this test covers the whole path: file -> model -> explorer -> viewer.
+    QString boardFixture(const QString &name) const
+    {
+        return QDir::cleanPath(
+            QStringLiteral("%1/../data/%2").arg(QStringLiteral(EDA_TEST_DIR), name));
+    }
+
+    void importingABoardFileFillsTheWholeWorkbench()
+    {
+        eda::Project *project = eda::Application::instance()->project();
+        QString error;
+        QVERIFY(project->create(QStringLiteral("Import test"), eda::TestEnvironment::root(), &error));
+
+        // Importing needs a project: the board alone is not the workspace.
+        QString importError = QStringLiteral("not set");
+        QVERIFY(m_window->action(QStringLiteral("file.importBoard")) != nullptr);
+        QVERIFY(m_window->importBoardFile(boardFixture(QStringLiteral("led-blink.kicad_pcb")),
+                                          &importError));
+        QVERIFY2(importError.isEmpty(), qPrintable(importError));
+
+        const eda::Board *board = project->primaryBoard();
+        QVERIFY(board != nullptr);
+        QCOMPARE(board->components.size(), 4);
+        QCOMPARE(board->nets.size(), 3);
+        QCOMPARE(project->data().documents.size(), 1);
+        QCOMPARE(project->data().documents.first().format, QStringLiteral("kicad-pcb"));
+
+        QCOMPARE(m_window->componentExplorer()->visibleCount(), 4);
+        QCOMPARE(m_window->boardView()->board(), board);
+
+        // The viewer built real geometry: a substrate, the outline, three
+        // tracks, two vias and a group per component.
+        QVERIFY2(m_window->boardView()->scene()->items().size() > 10,
+                 qPrintable(QString::number(m_window->boardView()->scene()->items().size())));
+
+        // The status bar says what was loaded, not just that something was.
+        bool found = false;
+        for (QLabel *label : m_window->statusBar()->findChildren<QLabel *>()) {
+            if (label->text().contains(QStringLiteral("4 components")))
+                found = true;
+        }
+        QVERIFY2(found, "the status bar has to report the imported board");
+
+        // Fitting a board that is on screen gives a usable zoom level.
+        m_window->resize(900, 600);
+        m_window->show();
+        QVERIFY(QTest::qWaitForWindowExposed(m_window));
+        m_window->boardView()->fitToBoard();
+        QVERIFY(m_window->boardView()->zoomFactor() > 0.05);
+        QVERIFY(m_window->boardView()->zoomFactor() <= 400.0);
+
+        // A second import replaces the board instead of adding a second one.
+        QVERIFY(m_window->importBoardFile(boardFixture(QStringLiteral("arcs.kicad_pcb")),
+                                          &importError));
+        QCOMPARE(project->data().boards.size(), 1);
+        // The four Edge.Cuts lines of the arcs fixture join into one loop, and
+        // the circle stays a loop of its own.
+        QCOMPARE(project->primaryBoard()->outlines.size(), 2);
+
+        QVERIFY(project->close());
+    }
+
+    void importingABrokenBoardIsRefusedWithoutTouchingTheProject()
+    {
+        eda::Project *project = eda::Application::instance()->project();
+        QString error;
+        QVERIFY(project->create(QStringLiteral("Broken import"), eda::TestEnvironment::root(),
+                                &error));
+
+        QString importError;
+        QVERIFY(!m_window->importBoardFile(boardFixture(QStringLiteral("broken.kicad_pcb")),
+                                           &importError));
+        QVERIFY2(!importError.isEmpty(), "the reason has to be reported");
+        QVERIFY(project->primaryBoard() == nullptr); // nothing was invented
+        QCOMPARE(project->data().documents.size(), 0);
+        QCOMPARE(m_window->componentExplorer()->visibleCount(), 0);
+
+        QVERIFY(project->close());
+    }
+
+    void boardViewDrawsRealGeometry()
+    {
+        // A board built by hand, so the test knows exactly what it expects:
+        // two pads 3 mm apart, one track, one via and a rectangular outline.
+        eda::Board board;
+        board.uid = QStringLiteral("b-geometry");
+        board.name = QStringLiteral("geometry");
+        eda::Component component;
+        component.uid = QStringLiteral("c-1");
+        component.reference = QStringLiteral("R1");
+        component.position = { 10.0, 10.0 };
+        eda::Pad pad;
+        pad.id = QStringLiteral("1");
+        pad.pin = QStringLiteral("1");
+        pad.position = { -1.5, 0.0 };
+        pad.size = { 1.0, 1.5 };
+        pad.shape = eda::PadShape::Rectangle;
+        eda::Pad second = pad;
+        second.id = QStringLiteral("2");
+        second.pin = QStringLiteral("2");
+        second.position = { 1.5, 0.0 };
+        component.pads = { pad, second };
+        board.components.append(component);
+        board.tracks.append(eda::Track{});
+        board.tracks.first().points = { { 5.0, 5.0 }, { 15.0, 5.0 } };
+        board.tracks.first().width = 0.25;
+        board.vias.append(eda::Via{});
+        board.vias.first().position = { 20.0, 20.0 };
+        board.vias.first().diameter = 0.8;
+        board.vias.first().drill = 0.4;
+        board.outlines.append({ { 0.0, 0.0 }, { 30.0, 0.0 }, { 30.0, 25.0 }, { 0.0, 25.0 },
+                                { 0.0, 0.0 } });
+        board.boundingBox = { 0.0, 0.0, 30.0, 25.0 };
+
+        eda::BoardView view;
+        view.setBoard(&board);
+        view.resize(400, 300);
+        view.show();
+
+        QVERIFY(view.scene() != nullptr);
+        QVERIFY2(view.scene()->items().size() >= 8,
+                 qPrintable(QString::number(view.scene()->items().size())));
+
+        // The scene is the board plus a margin, in millimetres.
+        const QRectF sceneRect = view.scene()->sceneRect();
+        QVERIFY(sceneRect.contains(QRectF(0.0, 0.0, 30.0, 25.0)));
+
+        // Hit testing finds the component where its pads actually are.
+        QCOMPARE(view.componentAt(QPointF(10.0, 10.0)), QStringLiteral("c-1"));
+        QVERIFY(view.componentAt(QPointF(1.0, 1.0)).isEmpty());
+
+        view.setSide(eda::BoardSide::Bottom);
+        QCOMPARE(eda::toString(view.side()), eda::toString(eda::BoardSide::Bottom));
+        view.setSide(eda::BoardSide::Top);
+
+        // An empty board is drawn as "nothing there", not as a fake board.
+        eda::Board empty;
+        empty.uid = QStringLiteral("b-empty");
+        view.setBoard(&empty);
+        QVERIFY(view.scene()->items().size() <= 2);
+
+        view.setBoard(nullptr);
+        QVERIFY(view.board() == nullptr);
+        QVERIFY(!view.scene()->items().isEmpty()); // the "no board loaded" hint
+    }
+
+    void showingTheBackMirrorsTheBoardWithoutMovingTheData()
+    {
+        eda::Project *project = eda::Application::instance()->project();
+        QString error;
+        QVERIFY(project->create(QStringLiteral("Side test"), eda::TestEnvironment::root(), &error));
+        QVERIFY(m_window->importBoardFile(boardFixture(QStringLiteral("led-blink.kicad_pcb")),
+                                          &error));
+
+        QAction *back = m_window->action(QStringLiteral("view.sideBottom"));
+        QVERIFY(back != nullptr);
+        QVERIFY(back->isEnabled()); // there is a board to turn over
+        QVERIFY(back->isCheckable());
+        QVERIFY(!back->isChecked());
+
+        const eda::Point2D placement = project->primaryBoard()->components.first().position;
+
+        back->trigger();
+        QVERIFY(back->isChecked());
+        QCOMPARE(eda::toString(m_window->boardView()->side()),
+                 eda::toString(eda::BoardSide::Bottom));
+        // The view is mirrored, which is what turning the board over looks like.
+        QVERIFY(m_window->boardView()->transform().m11() < 0.0);
+        QVERIFY(m_window->boardView()->transform().m22() > 0.0);
+        // The board itself is untouched: a component stays where the file put it.
+        QCOMPARE(project->primaryBoard()->components.first().position.x, placement.x);
+        QCOMPARE(project->primaryBoard()->components.first().position.y, placement.y);
+
+        bool sideLabel = false;
+        for (QLabel *label : m_window->statusBar()->findChildren<QLabel *>()) {
+            if (label->text().contains(QStringLiteral("back")))
+                sideLabel = true;
+        }
+        QVERIFY2(sideLabel, "the status bar has to say which side is shown");
+
+        back->trigger();
+        QVERIFY(!back->isChecked());
+        QCOMPARE(eda::toString(m_window->boardView()->side()),
+                 eda::toString(eda::BoardSide::Top));
+        QVERIFY(m_window->boardView()->transform().m11() > 0.0);
+
+        QVERIFY(project->close());
+        // Without a board there is nothing to turn over.
+        QVERIFY(!back->isEnabled());
     }
 
     void statusBarShowsProjectAndModelState()
