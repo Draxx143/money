@@ -7,8 +7,10 @@
 
 #include "../../src/application/AppIdentity.h"
 #include "../../src/application/Application.h"
+#include "../../src/core/Database.h"
 #include "../../src/core/Project.h"
 #include "../../src/ui/BoardView.h"
+#include "../../src/ui/ComponentDetails.h"
 #include "../../src/ui/ComponentExplorer.h"
 #include "../../src/ui/MainWindow.h"
 #include "../../src/ui/Theme.h"
@@ -18,6 +20,8 @@
 #include <QAction>
 #include <QDir>
 #include <QDockWidget>
+#include <QLineEdit>
+#include <QTreeWidget>
 #include <QGraphicsItem>
 #include <QLabel>
 #include <QMenuBar>
@@ -429,6 +433,155 @@ private slots:
         QVERIFY(project->close());
         // Without a board there is nothing to turn over.
         QVERIFY(!back->isEnabled());
+    }
+
+    // Imports the fixture board into a fresh project and returns the open
+    // project, ready for the panel tests.
+    eda::Project *projectWithImportedBoard()
+    {
+        eda::Project *project = eda::Application::instance()->project();
+        QString error;
+        if (project->isOpen())
+            project->close();
+        if (!project->create(QStringLiteral("details test"), eda::TestEnvironment::root(), &error))
+            return nullptr;
+        if (!m_window->importBoardFile(boardFixture(QStringLiteral("led-blink.kicad_pcb")),
+                                       &error)) {
+            return nullptr;
+        }
+        return project;
+    }
+
+    void componentDetailsFollowTheSelection()
+    {
+        eda::Project *project = projectWithImportedBoard();
+        QVERIFY(project != nullptr);
+        eda::ComponentDetails *details = m_window->componentDetails();
+        QVERIFY(details != nullptr);
+        QVERIFY(details->componentUid().isEmpty());
+
+        const eda::Board *board = project->primaryBoard();
+        const QString uid = board->componentByReference(QStringLiteral("C1"))->uid;
+
+        m_window->componentExplorer()->selectComponent(uid);
+        QCOMPARE(details->componentUid(), uid);
+        QVERIFY2(details->summaryText().contains(QStringLiteral("100n")),
+                 qPrintable(details->summaryText()));
+        QVERIFY2(details->summaryText().contains(QStringLiteral("GND")),
+                 qPrintable(details->summaryText()));
+        QVERIFY2(details->summaryText().contains(QStringLiteral("VCC")),
+                 qPrintable(details->summaryText()));
+
+        // The pads of the component are listed with their nets.
+        auto *pads = details->findChild<QTreeWidget *>(QStringLiteral("details.pads"));
+        QVERIFY(pads != nullptr);
+        QCOMPARE(pads->topLevelItemCount(), 2);
+        QCOMPARE(pads->topLevelItem(0)->text(0), QStringLiteral("1"));
+        QCOMPARE(pads->topLevelItem(0)->text(2), QStringLiteral("GND"));
+        QCOMPARE(pads->topLevelItem(1)->text(2), QStringLiteral("VCC"));
+
+        // Another component, another panel.
+        const QString other = board->componentByReference(QStringLiteral("R1"))->uid;
+        m_window->componentExplorer()->selectComponent(other);
+        QCOMPARE(details->componentUid(), other);
+        QVERIFY(!details->summaryText().contains(QStringLiteral("100n")));
+
+        QVERIFY(project->close());
+        QVERIFY(details->componentUid().isEmpty());
+    }
+
+    void editingAComponentKeepsTheSelectionAndMarksItAsHandEntered()
+    {
+        eda::Project *project = projectWithImportedBoard();
+        QVERIFY(project != nullptr);
+        const QString uid = project->primaryBoard()->componentByReference(QStringLiteral("C1"))->uid;
+        m_window->componentExplorer()->selectComponent(uid);
+        QVERIFY2(project->isDirty(), "importing a board leaves the project unsaved");
+
+        auto *mpn = m_window->componentDetails()->findChild<QLineEdit *>(
+            QStringLiteral("details.mpn"));
+        QVERIFY(mpn != nullptr);
+        QCOMPARE(mpn->text(), QStringLiteral("C0805C104K5RACTU"));   // read from the file
+        mpn->setText(QStringLiteral("C0805C104K5RACTU-DG"));
+        emit mpn->editingFinished();
+
+        const eda::Component *component = project->primaryBoard()->componentByUid(uid);
+        QCOMPARE(component->manufacturerPartNumber, QStringLiteral("C0805C104K5RACTU-DG"));
+        QVERIFY(project->isDirty());
+        // The value is now part file data and part hand entered data, and says
+        // so: it is not presented as confirmed.
+        QCOMPARE(eda::toString(component->provenance.valueSource),
+                 eda::toString(eda::ValueSource::ManualEntry));
+        QCOMPARE(eda::toString(component->provenance.status),
+                 eda::toString(eda::VerificationStatus::NeedsReview));
+
+        // Editing a component does not lose what the user was working on.
+        QCOMPARE(m_window->componentExplorer()->selectedComponentUid(), uid);
+        QCOMPARE(m_window->componentDetails()->componentUid(), uid);
+
+        QVERIFY(project->close());
+    }
+
+    void knowledgeAboutAComponentIsShownAndFound()
+    {
+        eda::Project *project = projectWithImportedBoard();
+        QVERIFY(project != nullptr);
+        eda::Database *database = eda::Application::instance()->database();
+        QVERIFY(database != nullptr);
+        QVERIFY2(database->isOpen(), qPrintable(database->lastError()));
+
+        // The part numbers the board file named are recorded on import: what was
+        // imported once is knowledge for the next board. The search is a
+        // substring search, so the exact part number is picked out of the hits.
+        const QVector<eda::ComponentRecord> records =
+            database->findComponents(QStringLiteral("C0805C104K5RACTU"));
+        int exact = 0;
+        for (const eda::ComponentRecord &candidate : records)
+            if (candidate.mpn == QStringLiteral("C0805C104K5RACTU"))
+                ++exact;
+        QCOMPARE(exact, 1);   // recorded once, however often the board is imported
+        const eda::ComponentRecord record =
+            database->findComponents(QStringLiteral("KEMET")).first();
+        QCOMPARE(record.mpn, QStringLiteral("C0805C104K5RACTU"));
+        QCOMPARE(record.manufacturer, QStringLiteral("KEMET"));
+        QVERIFY(record.provenance.localPath.endsWith(QStringLiteral("led-blink.kicad_pcb")));
+        QCOMPARE(eda::toString(record.provenance.status),
+                 eda::toString(eda::VerificationStatus::ExtractedFromSource));
+
+        const QString uid = project->primaryBoard()->componentByReference(QStringLiteral("C1"))->uid;
+        m_window->componentExplorer()->selectComponent(uid);
+        eda::ComponentDetails *details = m_window->componentDetails();
+        QCOMPARE(details->factCount(), 0);
+
+        eda::Fact fact;
+        fact.componentUid = uid;
+        fact.topic = QStringLiteral("measurement");
+        fact.statement = QStringLiteral("Measured 98.4 nF out of circuit at 1 kHz");
+        fact.value = QStringLiteral("98.4");
+        fact.unit = QStringLiteral("nF");
+        fact.provenance.title = QStringLiteral("bench, LCR meter");
+        fact.provenance.status = eda::VerificationStatus::ExperimentallyVerified;
+        fact.provenance.valueSource = eda::ValueSource::Measured;
+        fact.provenance.retrieved = QDateTime::currentDateTimeUtc();
+        QVERIFY2(database->addFact(&fact), qPrintable(database->lastError()));
+
+        details->refresh();
+        QCOMPARE(details->factCount(), 1);
+
+        // The search finds it, from anywhere in the database.
+        details->setSearchText(QStringLiteral("LCR meter"));
+        QCOMPARE(details->factCount(), 1);
+        QCOMPARE(database->lastSearchMode(), QStringLiteral("fts5"));
+        details->setSearchText(QStringLiteral("something nobody wrote down"));
+        QCOMPARE(details->factCount(), 0);
+        details->setSearchText(QString());
+        QCOMPARE(details->factCount(), 1);
+
+        QVERIFY(database->removeFact(fact.id));
+        details->refresh();
+        QCOMPARE(details->factCount(), 0);
+
+        QVERIFY(project->close());
     }
 
     void statusBarShowsProjectAndModelState()

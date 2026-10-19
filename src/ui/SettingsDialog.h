@@ -14,12 +14,15 @@ class QCheckBox;
 class QComboBox;
 class QLabel;
 class QLineEdit;
+class QPushButton;
 class QListWidget;
 class QSpinBox;
 class QStackedWidget;
 
 namespace eda {
 
+class Application;
+class Database;
 class Settings;
 
 class SettingsDialog : public QDialog
@@ -55,6 +58,7 @@ private:
     QWidget *createAiPage();
     QWidget *createPrivacyPage();
     QWidget *createDatabasePage();
+    void refreshDatabaseStatus();
     QWidget *createLoggingPage();
     QWidget *createImportPage();
 
@@ -89,6 +93,9 @@ private:
     // directories
     QLineEdit *m_projectDirEdit = nullptr;
     QLineEdit *m_databaseEdit = nullptr;
+    QLabel *m_databaseStatus = nullptr;
+    QPushButton *m_databaseCheck = nullptr;
+    QPushButton *m_databaseCompact = nullptr;
     QLineEdit *m_logDirEdit = nullptr;
     QLineEdit *m_backupDirEdit = nullptr;
 

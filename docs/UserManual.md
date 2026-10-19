@@ -43,6 +43,9 @@ The window is a classic workbench with dockable panels:
   mirrors the board the way it looks when you turn it over; the designators stay
   readable and the board data is not modified. The status bar shows the cursor
   position in millimetres, the current zoom factor and which side is shown.
+* **Component details** (right) – everything about the component you selected:
+  what the board file said, what you completed by hand, its pads with their
+  nets, and what is stored about it in the knowledge database.
 * **Assistant** (right) – the status of the optional AI features. Until a
   provider is configured it says so plainly and lists which diagnostic features
   work completely offline.
@@ -96,7 +99,33 @@ If the file cannot be read — it is not a KiCad board, it is truncated, or it i
 empty — nothing is imported at all. The error message names the file and the
 line where parsing stopped.
 
-## 5. Settings
+## 5. Component details and knowledge
+
+Select a component in the list, or click it on the board, and the **Component
+details** panel shows it in two tabs.
+
+**Component** – value, description, category, manufacturer, part number,
+package, datasheet link and notes. The fields are filled with what the board
+file said; you can complete them. As soon as you do, the component is marked as
+*partly hand entered* (`Needs review`), because it is now file data and your
+data mixed — it is never presented as confirmed. Below the fields, the panel
+names the source of the data and lists the pads of the component with their pin
+name, net and position.
+
+**Knowledge** – the facts stored about this component in the local database.
+Empty search box: this component's facts. Type something: every fact in the
+database is searched, and the panel says whether the full text index or a plain
+text scan answered. `Add...` asks for the statement, an optional value with its
+unit and conditions, and — as prominently — where it came from. A fact stored
+without a source is kept, but marked `Unverified`: it is a note, not evidence.
+Click a fact to see it in full, with its source and its status.
+
+The knowledge database is a single SQLite file in your data directory
+(`knowledge.sqlite3`). It is shared by all projects, it never leaves the
+computer, and `Settings → Database` shows where it is, how large it is, how many
+records and facts it holds, and lets you check and compact it.
+
+## 6. Settings
 
 `Settings → Configure…` opens a nine page dialog:
 
@@ -115,7 +144,7 @@ line where parsing stopped.
 8. **Logging** – log level, how many days of log files are kept.
 9. **Import Options** – defaults applied when a board file is imported.
 
-## 6. Privacy
+## 7. Privacy
 
 Nothing leaves the computer unless you explicitly configure an AI provider and
 enable network access on the *Privacy & Network* page. Both are off by default,

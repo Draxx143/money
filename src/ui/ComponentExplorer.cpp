@@ -69,8 +69,14 @@ ComponentExplorer::ComponentExplorer(QWidget *parent) : QWidget(parent)
 
 void ComponentExplorer::setBoard(const Board *board)
 {
+    // The list is rebuilt when the board changes (a new import, an edited
+    // component), which must not lose what the user had selected: the selection
+    // is a component, not a row.
+    const QString selected = selectedComponentUid();
     m_board = board;
     rebuild();
+    if (!selected.isEmpty())
+        selectComponent(selected);
 }
 
 void ComponentExplorer::rebuild()

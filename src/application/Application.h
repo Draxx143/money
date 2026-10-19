@@ -10,6 +10,7 @@
 namespace eda {
 
 class AppIdentity;
+class Database;
 class Project;
 class Settings;
 
@@ -29,6 +30,7 @@ public:
     void shutdown();
 
     Settings *settings() const { return m_settings; }
+    Database *database() const { return m_database; }
     AppIdentity *identity() const { return m_identity; }
     Project *project() const { return m_project; }
 
@@ -39,6 +41,7 @@ signals:
 
 private:
     Settings *m_settings = nullptr;
+    Database *m_database = nullptr;
     AppIdentity *m_identity = nullptr;
     Project *m_project = nullptr;
     bool m_initialized = false;

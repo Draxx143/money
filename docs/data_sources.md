@@ -31,10 +31,30 @@ came from** and **whether anybody checked it**. This file defines those levels.
 
 ## Local knowledge database
 
-`~/.local/share/pcb-workbench/knowledge.sqlite` holds what the application learns
-across projects: component descriptions, notes, and the full text index used to
-search imported documents (SQLite FTS5). It is a local file, it is not uploaded,
-and deleting it only loses those notes — projects keep working.
+`~/.local/share/pcb-workbench/knowledge.sqlite3` holds what the application
+learns across projects: component records (part number, manufacturer, category,
+datasheet) and facts about them — a pinout, an absolute maximum, a measured
+value, a typical failure — each with the source it came from. It is a local
+file, it is not uploaded, and deleting it only loses those notes: projects keep
+working.
+
+Search uses SQLite's FTS5 index over the statement, the topic and the source.
+The database reports which search it actually ran (`fts5` for the index, `text
+scan` for the fallback), so a result list never pretends to be something it is
+not.
+
+What goes into the database, and what does not:
+
+| Written | When | Provenance |
+| ------- | ---- | ---------- |
+| A component record | a board file names a part number | `ExtractedFromSource`, with the board file and the footprint as the location |
+| A component record completed by hand | you edit a part number or datasheet in the Component panel | `NeedsReview`, `ManualEntry` |
+| A fact you add | `Add...` in the Knowledge tab | what you enter: with a source it keeps the status you choose, without one it is stored as `Unverified` |
+| A fact from a datasheet or from a model | not yet — there is no importer or assistant that writes facts automatically | — |
+
+A component that the board file does not name (a bare "100n", a connector
+without a part number) is deliberately **not** recorded: a part number guessed
+from a value would be invented data.
 
 ## What is not a source
 

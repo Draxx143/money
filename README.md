@@ -40,9 +40,25 @@ Milestone 2 (real board import):
 * [x] Tests: s-expression reader, importer, and the whole path from a file to the
       explorer and the viewer
 
-The knowledge database, measurements, the diagnostic engine and the optional AI
-assistant follow in later milestones. They are not advertised as working today,
-and there is no menu entry for them yet.
+Milestone 3 (knowledge base):
+
+* [x] Local SQLite database, schema versioned and migrated, never silently
+      recreated when it is damaged
+* [x] Component records, filed by part number and manufacturer, with provenance
+* [x] Facts with topic, value, conditions and source, full text indexed (FTS5);
+      a fact without a source is stored as unverified, nothing is invented
+* [x] Component details panel: what the file said, what you completed, the pads
+      with their nets, and the knowledge stored about the part
+* [x] Importing a board records the part numbers it names, with the board file
+      as their source
+* [x] Database page in the settings: location, size, counts, integrity check and
+      compact
+* [x] Tests: 15 database cases (schema, FTS5 search, hostile input, damaged
+      file, newer version, reopen) and 3 UI cases for the panel
+
+Measurements, test points, the diagnostic engine and the optional AI assistant
+follow in later milestones. They are not advertised as working today, and there
+is no menu entry for them yet.
 
 ## Building
 

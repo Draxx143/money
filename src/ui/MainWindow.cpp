@@ -2,6 +2,7 @@
 
 #include "AssistantPanel.h"
 #include "BoardView.h"
+#include "ComponentDetails.h"
 #include "ComponentExplorer.h"
 #include "LogPanel.h"
 #include "SettingsDialog.h"
@@ -224,9 +225,11 @@ void MainWindow::createDocks()
     setCentralWidget(m_boardView);
     connect(m_boardView, &BoardView::componentClicked, this, [this](const QString &uid) {
         m_explorer->selectComponent(uid);
+        m_details->selectComponent(uid);
     });
     connect(m_explorer, &ComponentExplorer::componentSelected, this, [this](const QString &uid) {
         m_boardView->setSelectedComponent(uid);
+        m_details->selectComponent(uid);
     });
     connect(m_boardView, &BoardView::cursorPositionChanged, this, [this](const QPointF &position) {
         m_coordinateState->setText(tr("X %1 mm  Y %2 mm")
@@ -237,6 +240,22 @@ void MainWindow::createDocks()
         if (m_actions.contains(QStringLiteral("view.zoomIn"))) {
             Q_UNUSED(factor)
         }
+    });
+
+    m_details = new ComponentDetails(this);
+    m_details->setProject(project());
+    m_details->setDatabase(Application::instance()->database());
+    auto *detailsDock = new QDockWidget(tr("Component Details"), this);
+    detailsDock->setObjectName(QStringLiteral("ComponentDetailsDock"));
+    detailsDock->setWidget(m_details);
+    addDockWidget(Qt::RightDockWidgetArea, detailsDock);
+    m_docks.append(detailsDock);
+    connect(m_details, &ComponentDetails::componentEdited, this, [this](const QString &) {
+        // The explorer reads its values from the model, so it has to be told
+        // that one of its rows changed.
+        project()->markDirty();
+        m_explorer->setBoard(project()->primaryBoard());
+        updateProjectState();
     });
 
     m_assistant = new AssistantPanel(this);
@@ -298,6 +317,8 @@ void MainWindow::connectProjectSignals()
         Application::instance()->settings()->addRecentProject(path);
         m_explorer->setBoard(this->project()->primaryBoard());
         m_boardView->setBoard(this->project()->primaryBoard());
+        m_details->selectComponent(QString());
+        m_details->refresh();
         updateWindowTitle();
         updateProjectState();
         updateActionStates();
@@ -312,6 +333,8 @@ void MainWindow::connectProjectSignals()
     connect(project, &Project::closed, this, [this]() {
         m_explorer->setBoard(nullptr);
         m_boardView->setBoard(nullptr);
+        m_details->selectComponent(QString());
+        m_details->refresh();
         updateWindowTitle();
         updateProjectState();
         updateActionStates();
@@ -323,6 +346,7 @@ void MainWindow::connectProjectSignals()
     connect(project, &Project::dataChanged, this, [this]() {
         m_explorer->setBoard(this->project()->primaryBoard());
         m_boardView->setBoard(this->project()->primaryBoard());
+        m_details->refresh();
     });
 }
 
@@ -438,14 +462,20 @@ bool MainWindow::importBoardFile(const QString &path, QString *error)
     prj->data().documents.append(document);
     prj->markDirty();
 
+    // What the file says about its parts is reusable knowledge: it is recorded
+    // once, with the board file as its source.
+    const int recorded = recordComponentsInDatabase(*prj->primaryBoard());
+
     m_explorer->setBoard(prj->primaryBoard());
     m_boardView->setBoard(prj->primaryBoard());
     m_boardView->fitToBoard();
+    m_details->selectComponent(QString());
+    m_details->refresh();
     updateProjectState();
     updateActionStates();
 
     statusBar()->showMessage(
-        tr("Imported %1: %2 components, %3 pads, %4 nets, %5 tracks%6")
+        tr("Imported %1: %2 components, %3 pads, %4 nets, %5 tracks%6%7")
             .arg(info.fileName())
             .arg(result.componentCount)
             .arg(result.padCount)
@@ -454,7 +484,10 @@ bool MainWindow::importBoardFile(const QString &path, QString *error)
             .arg(board.warnings.isEmpty()
                      ? QString()
                      : tr(" (%n thing(s) in the file were not imported, see the log)", "",
-                          board.warnings.size())),
+                          board.warnings.size()))
+            .arg(recorded > 0 ? tr(", %n part number(s) recorded in the knowledge base", "",
+                                   recorded)
+                              : QString()),
         10000);
     logInfo(QStringLiteral("import"),
             tr("Imported %1 (%2 components)").arg(path).arg(result.componentCount));
@@ -715,6 +748,57 @@ void MainWindow::updateWindowTitle()
     if (prj->isOpen())
         document = prj->displayName() + (prj->isDirty() ? QStringLiteral("*") : QString());
     setWindowTitle(Application::instance()->identity()->windowTitle(document));
+}
+
+int MainWindow::recordComponentsInDatabase(const Board &board)
+{
+    Database *database = Application::instance()->database();
+    if (database == nullptr || !database->isOpen())
+        return 0;
+
+    int recorded = 0;
+    int failed = 0;
+    for (const Component &component : board.components) {
+        // Only a part the file actually names can be recorded. A component that
+        // is nothing but "100n" on a board is not a part number, and turning it
+        // into one would be inventing data.
+        if (component.manufacturerPartNumber.trimmed().isEmpty())
+            continue;
+
+        ComponentRecord record;
+        record.mpn = component.manufacturerPartNumber.trimmed();
+        record.manufacturer = component.manufacturer;
+        record.category = component.category;
+        record.description = component.description.isEmpty() ? component.value
+                                                             : component.description;
+        record.datasheetUrl = component.datasheetUrl;
+        record.datasheetPath = component.datasheetPath;
+        record.provenance.title = board.name;
+        record.provenance.localPath = board.sourcePath;
+        record.provenance.location = QStringLiteral("footprint %1").arg(component.reference);
+        record.provenance.status = VerificationStatus::ExtractedFromSource;
+        record.provenance.valueSource = ValueSource::ExtractedFromSource;
+        record.provenance.retrieved = QDateTime::currentDateTimeUtc();
+
+        QString error;
+        if (database->upsertComponent(&record, &error)) {
+            ++recorded;
+        } else {
+            ++failed;
+            if (failed == 1)
+                logError(QStringLiteral("database"), error);
+        }
+    }
+    if (failed > 1) {
+        logError(QStringLiteral("database"),
+                 tr("%1 part numbers could not be recorded in the knowledge database.")
+                     .arg(failed));
+    }
+    if (recorded > 0) {
+        logInfo(QStringLiteral("database"),
+                tr("%n part number(s) recorded in the knowledge database.", "", recorded));
+    }
+    return recorded;
 }
 
 void MainWindow::showBoardSide(BoardSide side)

@@ -3,6 +3,8 @@
 #include "../application/Application.h"
 #include "../application/Settings.h"
 #include "../core/Logging.h"
+#include "../core/Database.h"
+#include "../core/Logging.h"
 #include "../core/Paths.h"
 
 #include <QCheckBox>
@@ -75,6 +77,10 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent)
     buttonRow->addWidget(buttons);
     layout->addLayout(buttonRow);
 
+    connect(m_pageList, &QListWidget::currentRowChanged, this, [this](int row) {
+        if (row == PageDatabase)
+            refreshDatabaseStatus();
+    });
     connect(m_pageList, &QListWidget::currentRowChanged, m_pages,
             &QStackedWidget::setCurrentIndex);
 
@@ -347,15 +353,94 @@ QWidget *SettingsDialog::createDatabasePage()
     info->setWordWrap(true);
     form->addWidget(info);
 
-    auto *status = new QLabel(tr("Location: %1").arg(QDir::toNativeSeparators(Paths::databaseFile())),
-                              group);
-    status->setWordWrap(true);
-    status->setStyleSheet(QStringLiteral("color: #94A3B8;"));
-    form->addWidget(status);
+    m_databaseStatus = new QLabel(group);
+    m_databaseStatus->setWordWrap(true);
+    m_databaseStatus->setStyleSheet(QStringLiteral("color: #94A3B8;"));
+    form->addWidget(m_databaseStatus);
+
+    auto *buttons = new QHBoxLayout();
+    m_databaseCheck = new QPushButton(tr("Check integrity"), group);
+    m_databaseCompact = new QPushButton(tr("Compact"), group);
+    buttons->addWidget(m_databaseCheck);
+    buttons->addWidget(m_databaseCompact);
+    buttons->addStretch(1);
+    form->addLayout(buttons);
+
+    connect(m_databaseCheck, &QPushButton::clicked, this, [this]() {
+        Database *database = Application::instance()->database();
+        QString error;
+        if (database == nullptr || !database->isOpen()) {
+            QMessageBox::warning(this, tr("Knowledge database"),
+                                 tr("The knowledge database is not open."));
+            return;
+        }
+        if (database->checkIntegrity(&error)) {
+            QMessageBox::information(this, tr("Knowledge database"),
+                                     tr("The database and its search index are intact."));
+        } else {
+            QMessageBox::critical(this, tr("Knowledge database"), error);
+        }
+    });
+    connect(m_databaseCompact, &QPushButton::clicked, this, [this]() {
+        Database *database = Application::instance()->database();
+        if (database == nullptr || !database->isOpen()) {
+            QMessageBox::warning(this, tr("Knowledge database"),
+                                 tr("The knowledge database is not open."));
+            return;
+        }
+        QString error;
+        if (database->vacuum(&error))
+            QMessageBox::information(this, tr("Knowledge database"),
+                                     tr("The database was compacted."));
+        else
+            QMessageBox::critical(this, tr("Knowledge database"), error);
+        refreshDatabaseStatus();
+    });
 
     layout->addWidget(group);
     layout->addStretch(1);
+    refreshDatabaseStatus();
     return page;
+}
+
+void SettingsDialog::refreshDatabaseStatus()
+{
+    if (m_databaseStatus == nullptr)
+        return;
+
+    Database *database = Application::instance()->database();
+    const bool enabled = database != nullptr && database->isOpen();
+    if (m_databaseCheck)
+        m_databaseCheck->setEnabled(enabled);
+    if (m_databaseCompact)
+        m_databaseCompact->setEnabled(enabled);
+
+    if (database == nullptr) {
+        m_databaseStatus->setText(tr("The knowledge database is not available."));
+        return;
+    }
+    if (!database->isOpen()) {
+        m_databaseStatus->setText(tr("The knowledge database could not be opened: %1")
+                                      .arg(database->lastError().isEmpty()
+                                               ? tr("unknown reason")
+                                               : database->lastError()));
+        return;
+    }
+
+    const QFileInfo info(database->path());
+    QString size = QStringLiteral("-");
+    if (info.exists()) {
+        const double kb = double(info.size()) / 1024.0;
+        size = kb < 1024.0 ? tr("%1 kB").arg(kb, 0, 'f', 1)
+                           : tr("%1 MB").arg(kb / 1024.0, 0, 'f', 1);
+    }
+    m_databaseStatus->setText(
+        tr("Location: %1\nSchema %2  |  %n component record(s)  |  %3 fact(s)  |  %4")
+            .arg(QDir::toNativeSeparators(database->path()))
+            .arg(database->version())
+            .arg(database->componentCount())
+            .arg(database->factCount())
+            .arg(size));
 }
 
 QWidget *SettingsDialog::createLoggingPage()

@@ -3,6 +3,7 @@
 #include "AppIdentity.h"
 #include "Settings.h"
 
+#include "../core/Database.h"
 #include "../core/Logging.h"
 #include "../core/Paths.h"
 #include "../core/Project.h"
@@ -38,6 +39,7 @@ bool Application::initialize(QString *error)
     m_settings = new Settings(this);
     m_identity = new AppIdentity(this);
     m_project = new Project(this);
+    m_database = new Database(this);
 
     if (!Paths::ensureDirectories(error))
         return false;
@@ -53,6 +55,18 @@ bool Application::initialize(QString *error)
     }
 
     m_identity->load(m_settings);
+
+    // The knowledge database is opened here and not on demand: a failure has to
+    // be visible in the log and in the panel that uses it, not hidden until
+    // somebody searches for something.
+    const QString databasePath =
+        m_settings->value(QStringLiteral("paths/database"), Paths::databaseFile()).toString();
+    QString databaseError;
+    if (!m_database->open(databasePath, &databaseError)) {
+        // The workbench is perfectly usable without it; the knowledge panel
+        // says why it is empty.
+        logError(QStringLiteral("database"), databaseError);
+    }
 
     Logger::instance().setLogDirectory(
         m_settings->value(QStringLiteral("logging/directory"), Paths::logDir()).toString());
@@ -88,6 +102,7 @@ void Application::shutdown()
     if (!m_settings->save(&error))
         logError(QStringLiteral("settings"), error);
     logInfo(QStringLiteral("app"), QStringLiteral("shutting down"));
+    m_database->close();
     m_initialized = false;
 }
 

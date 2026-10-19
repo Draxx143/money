@@ -21,6 +21,7 @@ namespace eda {
 
 class AssistantPanel;
 class BoardView;
+class ComponentDetails;
 class ComponentExplorer;
 class LogPanel;
 class Project;
@@ -35,6 +36,7 @@ public:
     // Test and automation hooks.
     BoardView *boardView() const { return m_boardView; }
     ComponentExplorer *componentExplorer() const { return m_explorer; }
+    ComponentDetails *componentDetails() const { return m_details; }
     LogPanel *logPanel() const { return m_logPanel; }
     QAction *action(const QString &objectName) const;
 
@@ -71,6 +73,10 @@ protected:
 
 private:
     bool maybeSave();
+    // Puts every part the board file names into the knowledge database, so that
+    // what was imported once is available for the next board too. Returns how
+    // many part numbers were recorded.
+    int recordComponentsInDatabase(const Board &board);
     void createActions();
     void createMenus();
     void createToolbars();
@@ -90,6 +96,7 @@ private:
 
     BoardView *m_boardView = nullptr;
     ComponentExplorer *m_explorer = nullptr;
+    ComponentDetails *m_details = nullptr;
     AssistantPanel *m_assistant = nullptr;
     LogPanel *m_logPanel = nullptr;
 

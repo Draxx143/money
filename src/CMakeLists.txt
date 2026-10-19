@@ -11,6 +11,7 @@ add_library(eda_core STATIC
     core/Project.cpp
     core/SExpression.cpp
     core/KicadImport.cpp
+    core/Database.cpp
 )
 target_include_directories(eda_core
     PUBLIC
@@ -19,7 +20,7 @@ target_include_directories(eda_core
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/core
 )
-target_link_libraries(eda_core PUBLIC Qt6::Core Qt6::Gui)
+target_link_libraries(eda_core PUBLIC Qt6::Core Qt6::Gui Qt6::Sql)
 target_compile_options(eda_core PRIVATE -Wall -Wextra)
 
 add_library(eda_ui STATIC
@@ -28,6 +29,7 @@ add_library(eda_ui STATIC
     application/Settings.cpp
     ui/AssistantPanel.cpp
     ui/BoardView.cpp
+    ui/ComponentDetails.cpp
     ui/ComponentExplorer.cpp
     ui/LogPanel.cpp
     ui/MainWindow.cpp
