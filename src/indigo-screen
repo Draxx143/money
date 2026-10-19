@@ -1,0 +1,45 @@
+#!/usr/bin/python3
+"""Display a single, undecorated indigo screen. Press Escape to exit."""
+import gi
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gdk, Gtk
+
+
+class IndigoScreen(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Indigo Screen")
+        self.set_decorated(False)
+        self.set_default_size(800, 600)
+        self.set_name("indigo-screen")
+        style = Gtk.CssProvider()
+        style.load_from_data(b"#indigo-screen { background-color: #4b0082; }")
+        self.get_style_context().add_provider(
+            style, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+        self.connect("destroy", Gtk.main_quit)
+        self.connect("key-press-event", self.on_key_press)
+        self.connect("realize", self.hide_cursor)
+        self.fullscreen()
+
+    def hide_cursor(self, _window):
+        cursor = Gdk.Cursor.new_for_display(
+            self.get_display(), Gdk.CursorType.BLANK_CURSOR
+        )
+        self.get_window().set_cursor(cursor)
+
+    def on_key_press(self, _window, event):
+        if event.keyval == Gdk.KEY_Escape:
+            self.destroy()
+            return True
+        return False
+
+
+def main():
+    window = IndigoScreen()
+    window.show_all()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()

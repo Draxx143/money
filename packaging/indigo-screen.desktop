@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Indigo Screen
+Name[fa]=صفحهٔ نیلی
+Comment=Show a plain indigo screen (Escape to exit)
+Exec=indigo-screen
+Icon=applications-graphics
+Terminal=false
+Categories=Graphics;
+StartupNotify=false
