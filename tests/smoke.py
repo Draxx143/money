@@ -1,4 +1,8 @@
 """Run with /usr/bin/python3 under Xvfb, with both GTK 3 and 4 installed."""
+import warnings
+from gi import PyGIWarning
+warnings.simplefilter("error", PyGIWarning)
+
 import runpy
 from pathlib import Path
 from types import SimpleNamespace
